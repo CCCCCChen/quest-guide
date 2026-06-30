@@ -1,0 +1,20 @@
+[
+  {
+    "path": "/"
+  },
+  {
+    "path": "/quest-pool"
+  },
+  {
+    "path": "/skill-tree"
+  },
+  {
+    "path": "/shop"
+  },
+  {
+    "path": "/stats"
+  },
+  {
+    "path": "/settings"
+  }
+]

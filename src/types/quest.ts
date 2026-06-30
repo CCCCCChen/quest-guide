@@ -1,0 +1,97 @@
+// EXPORTS: IQuestTask, ISkillNode, IShopItem, IManaConfig, IActiveTrack, IFocusLog, IRedemption, IAppSettings, TaskType, TaskDifficulty, TaskStatus, SkillStatus
+
+export type TaskType = 'epic' | 'daily';
+export type TaskDifficulty = 'easy' | 'normal' | 'hard' | 'epic';
+export type TaskStatus = 'pending' | 'active' | 'completed';
+export type SkillStatus = 'locked' | 'unlocked' | 'enhanced';
+
+export interface IQuestTask {
+  id: string;
+  name: string;
+  description: string;
+  type: TaskType;
+  difficulty: TaskDifficulty;
+  estimatedMinutes: number;
+  actualMinutes: number;
+  relatedSkillId?: string;
+  bossName?: string;
+  bossProgress: number;
+  parentId?: string;
+  status: TaskStatus;
+  isTracking: boolean;
+  isAttention: boolean;
+  rewardReputation: number;
+  rewardSkillPoints: number;
+  createdAt: number;
+  completedAt?: number;
+  source?: 'mock' | 'user';
+  tags?: string[];
+}
+
+export interface ISkillNode {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  parentId?: string;
+  level: number;
+  status: SkillStatus;
+  x: number;
+  y: number;
+  icon?: string;
+  requiredSkillPoints: number;
+  unlockedAt?: number;
+}
+
+export interface IShopItem {
+  id: string;
+  name: string;
+  cost: number;
+  icon: string;
+  color?: string;
+  description?: string;
+  source: 'mock' | 'user';
+  createdAt: number;
+}
+
+export interface IManaConfig {
+  maxAttentionTasks: number;
+  current: number;
+}
+
+export interface IActiveTrack {
+  taskId: string;
+  accumulatedSeconds: number;
+  lastStartTime?: number;
+  isRunning: boolean;
+}
+
+export interface IFocusLog {
+  id: string;
+  taskId: string;
+  date: string;
+  durationMinutes: number;
+  completedAt: number;
+}
+
+export interface IRedemption {
+  id: string;
+  itemId: string;
+  itemName: string;
+  cost: number;
+  redeemedAt: number;
+}
+
+export interface IFloatingPosition {
+  x: number;
+  y: number;
+}
+
+export interface IAppSettings {
+  manaMax: number;
+  resetTime: string;
+  soundEnabled: boolean;
+  floatingPosition: IFloatingPosition;
+  floatingOpacity: number;
+  floatingCollapseDelay: number;
+}

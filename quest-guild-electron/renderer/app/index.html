@@ -1,0 +1,14 @@
+<!doctype html><html lang="en"><head><script>(function(){
+  var needsPolyfill=(function(){
+    try{
+      if(typeof crypto==="undefined"||typeof crypto.randomUUID!=="function")return true;
+      if(typeof Object.hasOwn!=="function")return true;
+      if(typeof[].at!=="function")return true;
+      if(typeof[].findLast!=="function")return true;
+      return false;
+    }catch(e){return true}
+  })();
+  if(needsPolyfill){
+    document.write('<script src="./assets/polyfills.js"><\/script>');
+  }
+})();</script><meta charset="UTF-8"><link rel="icon" type="image/svg+xml" href="./favicon.svg"><meta name="viewport" content="width=device-width,initial-scale=1"><title>悬赏任务公会</title><script type="module" crossorigin src="./assets/index-Ct4OtZLS.js"></script><link rel="modulepreload" crossorigin href="./assets/rolldown-runtime-Cyuzqnbw.js"><link rel="modulepreload" crossorigin href="./assets/radix-BrVP51RX.js"><link rel="modulepreload" crossorigin href="./assets/toolkit-CU6Y3HGq.js"><link rel="stylesheet" crossorigin href="./assets/index-BNicaDUZ.css"><meta property="og:title" content="悬赏任务公会"><meta property="og:description" content="悬赏任务公会 - RPG游戏风格的目标管理工具"><meta property="og:image" content="./favicon.svg"><meta name="description" content="悬赏任务公会 - RPG游戏风格的目标管理工具"></head><body><div id="root"></div></body></html>
