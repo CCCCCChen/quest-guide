@@ -377,3 +377,132 @@ interface IAppSettings {
 - **Mono-hue tyranny**: 金色铺满按钮、tab、icon、边框、链接、标题；按 65-25-10 分配，金色只给 CTA 与品牌锚点，其余用紫蓝 accent 与中性色
 - **Status color drift**: 成功绿/警告橙饱和度过高，盖过主风格；语义色饱和度与 primary 金色对齐 ±15%
 - **Readability sacrifice**: 为了游戏感用花哨字体排正文；正文坚持 Noto Sans SC，display 字体只用于标题和关键数值
+
+---
+
+# Electron 桌面版
+
+## 概述
+
+- **交付物**：完全离线可用的桌面端应用（.exe / 便携版 / 安装版）
+- **技术栈**：Electron 28 + 同代码库 Vite React 前端
+- **特性**：保留全部网页版功能，新增悬浮窗、系统托盘、全屏主窗口能力，零外部 CDN 依赖，所有数据存储加密。
+
+---
+
+## Electron 特有功能
+
+### 系统托盘
+- 常驻托盘图标显示/隐藏主窗口/悬浮窗
+- 右键菜单：打开主窗口 / 显示悬浮窗 / 今日任务概览（占位） / 退出
+- 单击托盘快速切换主窗口可见性
+- 主窗口关闭按钮默认最小化到悬浮窗而非直接退出
+
+### 悬浮窗
+
+- 收起态：迷你悬浮条（宽 360px / 高 72px），展示当前追踪任务名称、专注计时器、法力水晶占位；-webkit-app-region:drag 区域可直接拖拽移动，-webkit-app-region:no-drag 给按钮和任务卡片点击
+- 展开态：鼠标悬停 180ms 延迟展开，宽 360px / 高 500px 完整面板，包含追踪任务、快捷操作、注意力任务、底部快捷栏；展开后面板移出鼠标 260ms 延迟收起；收起条淡出、展开面板淡入/位移，搭配平滑高度变化（200ms ~ 260ms）
+- 完全脱网可用：本地渲染的纯静态 HTML/CSS/JS，无外部资源请求
+- 位置记忆：自动保存最后拖拽位置到 electron-store
+- 收起态只保留顶部条可点击区域，其余透明穿透
+- 窗口缩放锚点为底边，窗口高度增大时保持底边不动向下移动
+
+### 离线改造
+- 完全去除所有外部 CDN 资源引用、监控 SDK（Slardar、Performance SDK）、模板占位串（{{appName}}/{{appAvatar}} 等）
+- Vite 前端统一打包，在 quest-guild-electron/renderer/app/ 下生成干净无依赖的生产构建产物
+- 打包产物内所有资源路径为 ./ 开头的相对路径，配合 HashRouter（file:/// 协议下可用）
+- electron-builder 打包产物目录从 dist 切换到 release 目录下，避免老目录占用冲突
+- electron-builder 配置 setAsDefaultProtocolClient 以及 nsis 设置为可选（可选启动菜单、快捷方式）
+- electron-builder 配置关闭代码签名，解决在网络受限环境下下载签名相关依赖失败
+- electron-builder 配置 electron 本地缓存配置指向项目 .electron-cache
+
+---
+
+## 构建与打包流程
+
+### 项目布局
+
+```
+quest-guide/
+├── src/                 # 原版前端源文件
+├── index.html          # 原版前端入口
+├── vite.config.ts      # 原版 Vite 配置
+├── quest-guild-electron/ # Electron 桌面版包
+│   ├── main.js       # 主进程（窗口管理 / ipc 事件）
+│   ├── preload.js    # 预加载脚本（contextBridge 暴露 electronAPI）
+│   ├── package.json  # Electron 包配置
+│   ├── package-lock.json
+│   ├── renderer/      # 渲染进程页面
+│   │   ├── float.html  # 独立悬浮窗页面
+│   │   └── app/      # 主窗口渲染页面（Vite 构建产物，build:renderer 命令生成）
+│   ├── assets/      # 本地资源目录（icon.ico/icon.png 待用户自行添加）
+│   ├── .electron-cache/  # Electron 本地缓存目录
+│   └── .gitignore
+├── AGENTS.md          # 本文档
+├── package.json        # 根包配置
+└── vite.config.ts
+```
+
+### 使用命令
+
+- 安装依赖：根目录 + Electron 目录各自 npm install
+
+```bash
+# 根目录（前端依赖）
+cd quest-guide && npm install
+
+# Electron 目录（Electron 依赖）
+cd quest-guild-electron && npm install
+```
+
+- 构建渲染端并启动开发模式：
+
+```bash
+cd quest-guild-electron && npm start
+```
+
+- 打包构建命令：
+
+```bash
+cd quest-guild-electron && npm run build:win64
+```
+
+输出产物：
+
+- release/win-unpacked/：未打包可执行文件目录
+- release/悬赏任务公会 Setup 1.0.0.exe：64 位安装包（一键安装/卸载）
+- release/悬赏任务公会-Portable.exe：64 位便携版（绿色免安装）
+
+---
+
+## 打包配置说明
+
+（主要配置在 `quest-guild-electron/package.json`）
+
+- `directories.output`: 输出目录设为 `release`
+- `win.target`: nsis + portable，arch x64
+- `files` 包含 main.js, preload.js, renderer/**, assets/**
+- `nsis`: `oneClick: false`，支持自定义安装位置；`createDesktopShortcut: true`，创建桌面快捷方式；`createStartMenuShortcut: true`，创建开始菜单项
+- `productName`: `悬赏任务公会`
+- `build.productName`: `悬赏任务公会`
+- `build.directories.output`: `release`
+
+---
+
+## 数据存储与迁移
+
+Electron 桌面版使用 `electron-store` 加密 JSON 文件本地存储，默认存储在 Windows %APPDATA%/quest-guild/ 下的 `quest-guild-data.json`。
+
+Electron 主进程通过 preload 脚本暴露 `window.electronAPI` 下的 store 操作，在渲染进程里调用；悬浮窗 float.html 也用同样的 store。
+
+---
+
+## 后续可做优化
+
+- 完善悬浮窗主窗口数据双向同步
+- 完善主窗口前端状态保存
+- 完善主窗口前端对接 electron-store
+- 完善悬浮窗展开态快捷栏功能（快速悬赏/技能树/公会商店）
+- 完善图标替换（现在只有占位）
+- 完善开机自启（可选）
+- 完善更新逻辑（可选）
