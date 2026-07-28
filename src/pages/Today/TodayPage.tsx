@@ -187,6 +187,14 @@ export default function TodayPage() {
     toast.success('已加入注意力任务');
   };
 
+  const handleOpenTask = (task: IQuestTask) => {
+    if (task.projectId) {
+      navigate(`/projects/${task.projectId}`);
+      return;
+    }
+    navigate('/quest-pool');
+  };
+
   return (
     <div className="space-y-6">
       {/* 页面标题 */}
@@ -297,6 +305,7 @@ export default function TodayPage() {
               projectName={highestValueTask.projectId ? projectNameMap.get(highestValueTask.projectId) : undefined}
               onTrack={() => handleSetTracking(highestValueTask.id)}
               onFocus={() => handleAddAttention(highestValueTask.id)}
+              onOpen={() => handleOpenTask(highestValueTask)}
             />
           )}
           {biggestGrowthTask && (
@@ -309,6 +318,7 @@ export default function TodayPage() {
               projectName={biggestGrowthTask.projectId ? projectNameMap.get(biggestGrowthTask.projectId) : undefined}
               onTrack={() => handleSetTracking(biggestGrowthTask.id)}
               onFocus={() => handleAddAttention(biggestGrowthTask.id)}
+              onOpen={() => handleOpenTask(biggestGrowthTask)}
             />
           )}
         </section>
@@ -614,6 +624,7 @@ function RecommendationCard({
   projectName,
   onTrack,
   onFocus,
+  onOpen,
 }: {
   title: string;
   subtitle: string;
@@ -623,6 +634,7 @@ function RecommendationCard({
   projectName?: string;
   onTrack: () => void;
   onFocus: () => void;
+  onOpen: () => void;
 }) {
   const accentClass =
     accent === 'primary'
@@ -664,6 +676,10 @@ function RecommendationCard({
           <Button size="sm" variant="outline" onClick={onFocus} className="gap-1.5">
             <Zap className="h-3.5 w-3.5" />
             加入注意力
+          </Button>
+          <Button size="sm" variant="outline" onClick={onOpen} className="gap-1.5">
+            <ChevronRight className="h-3.5 w-3.5" />
+            查看
           </Button>
         </div>
       </CardContent>

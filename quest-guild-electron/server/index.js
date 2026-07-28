@@ -96,6 +96,10 @@ db.exec(`
     proficiencyLevel INTEGER DEFAULT 0,
     experience INTEGER DEFAULT 0,
     lastImprovedAt INTEGER
+    unlockedAt INTEGER,
+    proficiencyLevel INTEGER DEFAULT 0,
+    experience INTEGER DEFAULT 0,
+    lastImprovedAt INTEGER
   );
 
   CREATE TABLE IF NOT EXISTS shop_items (

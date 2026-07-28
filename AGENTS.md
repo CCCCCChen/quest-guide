@@ -506,3 +506,82 @@ Electron 主进程通过 preload 脚本暴露 `window.electronAPI` 下的 store 
 - 完善图标替换（现在只有占位）
 - 完善开机自启（可选）
 - 完善更新逻辑（可选）
+
+---
+
+# 当前实现进展（2026-07-28 更新）
+
+## 当前工程现状
+
+- 前端已从飞书容器 / `@lark-apaas/*` preset 迁移到标准 Web 工程：
+  - `vite@8` + `@vitejs/plugin-react`
+  - `tailwindcss@4` + `@tailwindcss/vite`
+  - 标准 `typescript-eslint` / `eslint` flat config
+- `src/` 代码已不再依赖飞书容器组件与运行时；入口为普通 React 应用。
+- 根目录构建命令现在是：
+  - 开发：`npm run dev`
+  - 类型检查：`npm run typecheck`
+  - 生产构建：`npm run build`
+
+## 当前已落地功能
+
+- 任务系统：
+  - `IQuestTask` 已扩展 `goalId`、`projectId`、`capabilityIds`
+  - 悬赏池支持创建 / 编辑任务时关联目标、项目、能力
+- 能力树系统：
+  - 已替换为“个人成长能力树”
+  - `skills` 支持 `proficiencyLevel`、`experience`、`lastImprovedAt`
+  - 完成任务会给关联能力发经验，并在能力树详情侧栏展示成长信息
+- 2.0 数据底座：
+  - 已新增 `Goal / Project / Reflection`
+  - 后端已落地 `goals / projects / reflections` 表与 CRUD API
+  - 前端已有 `GoalsPage`、`ProjectsPage`、`ReflectionsPage`
+- 项目联动：
+  - 新增 `ProjectDetailPage`，路由为 `/projects/:id`
+  - 项目详情页可查看项目任务、按任务完成比例计算进度
+  - 可在项目详情页直接创建任务，并自动带上 `goalId / projectId / capabilityIds`
+  - Today 页推荐卡可直接跳转到项目详情或悬赏池
+- Today 推荐：
+  - 已有“今日最高价值任务”
+  - 已有“今日最大成长任务”
+  - 支持一键设为追踪、加入注意力、查看任务入口
+
+## 当前后端 / Electron 状态
+
+- `server/index.js` 已支持：
+  - `tasks` 表扩展 `goalId / projectId / capabilityIds`
+  - `skills` 表扩展 `proficiencyLevel / experience / lastImprovedAt`
+  - `goals / projects / reflections` 表
+- Electron 当前关键状态：
+  - `quest-guild-electron/main.js` 已支持自动拉起本地 `server/index.js`
+  - 启动时优先尝试 `3001`，若占用则向上找可用端口
+  - 渲染进程 API 代理会转发到实际后端端口
+  - 生产环境悬浮窗统一走 `renderer/app/index.html?mode=floating`
+- Electron 常用命令：
+  - 开发启动：`quest-guild-electron\\npm run start`
+  - 仅构建渲染端：`quest-guild-electron\\npm run build:renderer`
+  - Windows 打包：`quest-guild-electron\\npm run build:win64`
+
+## 本次修复记录
+
+- 已修复 `server/index.js` 中 `skills` API 段落的重复 SQL 拼接错误。
+- 根因：`/api/skills/batch-init`、`/api/skills`、`/api/skills/import` 代码块内误插入了重复的 SQL / 字段定义，导致 Node 在启动时出现 `SyntaxError: Invalid or unexpected token`。
+- 这个错误会直接导致后端无法启动，进而让前端 Vite 开发环境出现一串 `/api/*` 的 `ECONNREFUSED` 代理报错。
+- 修复后已验证：
+  - `http://127.0.0.1:3001/api/tasks` 返回 `200`
+  - `http://127.0.0.1:3001/api/goals` 返回 `200`
+  - `http://127.0.0.1:3001/api/projects` 返回 `200`
+  - `http://127.0.0.1:3001/api/settings` 返回 `200`
+  - `http://127.0.0.1:5173/api/tasks` 通过 Vite proxy 返回 `200`
+
+## 当前建议的继续方向
+
+- 优先做 `Project -> Capability` 聚合：
+  - 在项目详情页展示项目关联能力
+  - 汇总该项目近 7 天能力经验增长
+- 再做 `Goal -> Project -> Task -> Capability` 完整闭环：
+  - 目标页显示项目进度汇总
+  - Today 推荐引入目标权重与项目上下文
+- 若继续增强 Electron：
+  - 补主进程托管后端的健康检查与退出清理日志
+  - 补开发模式下 Electron + Vite + local server 的一键联调脚本

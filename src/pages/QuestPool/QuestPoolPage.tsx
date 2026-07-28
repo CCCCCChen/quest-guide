@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useSearchParams } from 'react-router-dom';
 import {
   Swords,
   Plus,
@@ -103,6 +104,7 @@ const formSchema = z.object({
 type FormValues = z.infer<typeof formSchema>;
 
 export default function QuestPoolPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const {
     tasks,
     addTask,
@@ -148,12 +150,18 @@ export default function QuestPoolPage() {
   const watchGoalId = form.watch('goalId');
   const watchProjectId = form.watch('projectId');
 
+  const projectFilterId = searchParams.get('projectId') || '';
+  const projectFilter = useMemo(() => {
+    if (!projectFilterId) return null;
+    return projects.find((p) => p.id === projectFilterId) || null;
+  }, [projects, projectFilterId]);
+
   const epicRootTasks = useMemo(() => {
-    return tasks.filter((t) => t.type === 'epic' && !t.parentId);
-  }, [tasks]);
+    return tasks.filter((t) => t.type === 'epic' && !t.parentId && (!projectFilterId || t.projectId === projectFilterId));
+  }, [tasks, projectFilterId]);
 
   const dailyTasks = useMemo(() => {
-    let list = tasks.filter((t) => t.type === 'daily');
+    let list = tasks.filter((t) => t.type === 'daily' && (!projectFilterId || t.projectId === projectFilterId));
     if (searchKeyword) {
       const kw = searchKeyword.toLowerCase();
       list = list.filter(
@@ -169,7 +177,7 @@ export default function QuestPoolPage() {
       list = list.filter((t) => t.status === statusFilter);
     }
     return list;
-  }, [tasks, searchKeyword, difficultyFilter, statusFilter]);
+  }, [tasks, searchKeyword, difficultyFilter, statusFilter, projectFilterId]);
 
   const getChildren = (parentId: string) =>
     tasks.filter((t) => t.parentId === parentId);
@@ -196,7 +204,7 @@ export default function QuestPoolPage() {
       estimatedMinutes: 30,
       relatedSkillId: '',
       goalId: '',
-      projectId: '',
+      projectId: projectFilterId,
       bossName: '',
       parentId: '',
     });
@@ -311,6 +319,27 @@ export default function QuestPoolPage() {
 
   return (
     <div className="space-y-6">
+      {projectFilter ? (
+        <Card className="border-border/50 bg-card/60">
+          <CardContent className="py-3 flex flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant="outline">已筛选项目</Badge>
+              <span className="text-sm font-medium">{projectFilter.name}</span>
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                const next = new URLSearchParams(searchParams);
+                next.delete('projectId');
+                setSearchParams(next, { replace: true });
+              }}
+            >
+              清除筛选
+            </Button>
+          </CardContent>
+        </Card>
+      ) : null}
       {/* 标题栏 */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">

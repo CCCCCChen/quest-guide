@@ -4,6 +4,7 @@ import NotFoundPage from "@/pages/NotFoundPage/NotFoundPage";
 import TodayPage from "@/pages/Today/TodayPage";
 import GoalsPage from "@/pages/Goals/GoalsPage";
 import ProjectsPage from "@/pages/Projects/ProjectsPage";
+import ProjectDetailPage from "@/pages/Projects/ProjectDetailPage";
 import ReflectionsPage from "@/pages/Reflections/ReflectionsPage";
 import QuestPoolPage from "@/pages/QuestPool/QuestPoolPage";
 import SkillTreePage from "@/pages/SkillTree/SkillTreePage";
@@ -44,6 +45,7 @@ export default function App() {
         <Route index element={<TodayPage />} />
         <Route path="goals" element={<GoalsPage />} />
         <Route path="projects" element={<ProjectsPage />} />
+        <Route path="projects/:id" element={<ProjectDetailPage />} />
         <Route path="reflections" element={<ReflectionsPage />} />
         <Route path="quest-pool" element={<QuestPoolPage />} />
         <Route path="skill-tree" element={<SkillTreePage />} />

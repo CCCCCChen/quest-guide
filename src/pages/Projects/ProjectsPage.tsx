@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
-import { FolderKanban, Plus, Edit2, Trash2, Target, Clock } from 'lucide-react';
+import { FolderKanban, Plus, Edit2, Trash2, Target, Clock, ChevronRight } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
@@ -64,6 +65,7 @@ const taskFormSchema = z.object({
 type TaskFormValues = z.infer<typeof taskFormSchema>;
 
 export default function ProjectsPage() {
+  const navigate = useNavigate();
   const { goals } = useGoals();
   const { projects, addProject, updateProject, deleteProject } = useProjects();
   const { tasks, addTask } = useTasks();
@@ -259,7 +261,13 @@ export default function ProjectsPage() {
             <CardHeader className="pb-2">
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0">
-                  <CardTitle className="text-lg truncate">{project.name}</CardTitle>
+                  <CardTitle
+                    className="text-lg truncate hover:text-primary cursor-pointer flex items-center gap-2"
+                    onClick={() => navigate(`/projects/${project.id}`)}
+                  >
+                    <span className="truncate">{project.name}</span>
+                    <ChevronRight className="size-4 text-muted-foreground shrink-0" />
+                  </CardTitle>
                   <div className="mt-2 flex items-center gap-2 flex-wrap">
                     <Badge variant={project.status === 'archived' ? 'secondary' : 'default'}>
                       {project.status === 'archived' ? '已归档' : project.status === 'completed' ? '已完成' : '进行中'}
@@ -270,6 +278,13 @@ export default function ProjectsPage() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => navigate(`/projects/${project.id}`)}
+                  >
+                    查看详情
+                  </Button>
                   <Button
                     variant="secondary"
                     size="sm"
@@ -307,9 +322,24 @@ export default function ProjectsPage() {
               <div className="space-y-1">
                 <div className="flex items-center justify-between text-xs text-muted-foreground">
                   <span>进度</span>
-                  <span>{project.progress}%</span>
+                  <span>
+                    {(() => {
+                      const list = tasksByProject.get(project.id) || [];
+                      const total = list.length;
+                      const completed = list.filter((t) => t.status === 'completed').length;
+                      const pct = total === 0 ? project.progress : Math.round((completed / total) * 100);
+                      return `${pct}%`;
+                    })()}
+                  </span>
                 </div>
-                <Progress value={project.progress} />
+                <Progress
+                  value={(() => {
+                    const list = tasksByProject.get(project.id) || [];
+                    const total = list.length;
+                    const completed = list.filter((t) => t.status === 'completed').length;
+                    return total === 0 ? project.progress : Math.round((completed / total) * 100);
+                  })()}
+                />
               </div>
 
               <div className="space-y-2 pt-2">
