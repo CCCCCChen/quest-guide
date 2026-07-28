@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
+import { useState, useRef, useCallback, useEffect, useMemo, type CSSProperties } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Play,
@@ -263,7 +263,7 @@ export default function FloatingWidget({ isWindowMode = false }: { isWindowMode?
             exit={{ opacity: 0, scale: 0.9, y: 10 }}
             transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
             onMouseDown={!isWindowMode ? handleDragStart : undefined}
-            style={isWindowMode ? { WebkitAppRegion: 'drag' as const, width: '100%' } : undefined}
+            style={isWindowMode ? ({ WebkitAppRegion: 'drag', width: '100%' } as CSSProperties) : undefined}
             className={cn(
               isWindowMode ? 'w-full h-[72px] rounded-xl' : 'w-[360px] h-[72px] rounded-xl cursor-move',
               'bg-card/90 backdrop-blur-xl border border-primary/40',
@@ -343,7 +343,7 @@ export default function FloatingWidget({ isWindowMode = false }: { isWindowMode?
           >
             {/* 头部 */}
             <div
-              style={isWindowMode ? { WebkitAppRegion: 'drag' as const } : undefined}
+              style={isWindowMode ? ({ WebkitAppRegion: 'drag' } as CSSProperties) : undefined}
               className="flex items-center justify-between px-4 py-3 border-b border-border/40 bg-gradient-to-r from-primary/10 via-transparent to-accent/10"
             >
               <div className="flex items-center gap-2">
@@ -363,7 +363,7 @@ export default function FloatingWidget({ isWindowMode = false }: { isWindowMode?
                     'h-7 w-7 hover:bg-secondary/60',
                     isPinned && 'text-primary',
                   )}
-                  style={isWindowMode ? { WebkitAppRegion: 'no-drag' as const } : undefined}
+                  style={isWindowMode ? ({ WebkitAppRegion: 'no-drag' } as CSSProperties) : undefined}
                   onClick={() => setIsPinned(!isPinned)}
                   title={isPinned ? '取消置顶' : '置顶'}
                 >
@@ -373,7 +373,7 @@ export default function FloatingWidget({ isWindowMode = false }: { isWindowMode?
                   variant="ghost"
                   size="icon"
                   className="h-7 w-7 hover:bg-secondary/60"
-                  style={isWindowMode ? { WebkitAppRegion: 'no-drag' as const } : undefined}
+                  style={isWindowMode ? ({ WebkitAppRegion: 'no-drag' } as CSSProperties) : undefined}
                   onClick={() => setIsExpanded(false)}
                   title="收起"
                 >
@@ -383,7 +383,7 @@ export default function FloatingWidget({ isWindowMode = false }: { isWindowMode?
                   variant="ghost"
                   size="icon"
                   className="h-7 w-7 hover:bg-secondary/60"
-                  style={isWindowMode ? { WebkitAppRegion: 'no-drag' as const } : undefined}
+                  style={isWindowMode ? ({ WebkitAppRegion: 'no-drag' } as CSSProperties) : undefined}
                   onClick={handleExpandMain}
                   title="展开主界面"
                 >

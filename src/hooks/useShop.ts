@@ -241,7 +241,6 @@ export function useShop() {
       const next = [...list];
       next[index] = updated;
       setShopItemsValue(next);
-      shopApi.addItem(patch).catch(() => {}); // 简化：通过 addItem 同步修改
       toast.success('商品已更新', { description: updated.name });
       return true;
     },
@@ -261,6 +260,7 @@ export function useShop() {
     addReputation,
     addShopItem,
     deleteShopItem,
+    removeShopItem: deleteShopItem,
     redeemItem,
     resetShop,
     updateShopItem,

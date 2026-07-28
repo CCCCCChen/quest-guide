@@ -568,14 +568,14 @@ export default function QuestPoolPage() {
                   name="relatedSkillId"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>关联技能</FormLabel>
+                      <FormLabel>关联能力</FormLabel>
                       <Select
                         onValueChange={field.onChange}
                         value={field.value || ''}
                       >
                         <FormControl>
                           <SelectTrigger>
-                            <SelectValue placeholder="选择技能" />
+                            <SelectValue placeholder="选择能力节点" />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>

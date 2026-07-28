@@ -13,7 +13,7 @@ export const PRESET_TASKS: IQuestTask[] = [
     difficulty: 'hard',
     estimatedMinutes: 2400,
     actualMinutes: 480,
-    relatedSkillId: 'skill-frontend',
+    relatedSkillId: 'cap-creation-tech-frontend',
     bossName: '作品集上线巨龙',
     bossProgress: 20,
     stage: 1,
@@ -34,7 +34,7 @@ export const PRESET_TASKS: IQuestTask[] = [
     difficulty: 'normal',
     estimatedMinutes: 480,
     actualMinutes: 360,
-    relatedSkillId: 'skill-ui',
+    relatedSkillId: 'cap-creation-product-prototype',
     parentId: 'epic-portfolio',
     bossProgress: 75,
     stage: 1,
@@ -56,7 +56,7 @@ export const PRESET_TASKS: IQuestTask[] = [
     difficulty: 'normal',
     estimatedMinutes: 360,
     actualMinutes: 120,
-    relatedSkillId: 'skill-react',
+    relatedSkillId: 'cap-creation-tech-software',
     parentId: 'epic-portfolio',
     bossProgress: 30,
     stage: 2,
@@ -77,7 +77,7 @@ export const PRESET_TASKS: IQuestTask[] = [
     difficulty: 'normal',
     estimatedMinutes: 480,
     actualMinutes: 0,
-    relatedSkillId: 'skill-frontend',
+    relatedSkillId: 'cap-creation-tech-frontend',
     parentId: 'epic-portfolio',
     bossProgress: 0,
     stage: 3,
@@ -100,7 +100,7 @@ export const PRESET_TASKS: IQuestTask[] = [
     difficulty: 'epic',
     estimatedMinutes: 4800,
     actualMinutes: 600,
-    relatedSkillId: 'skill-data',
+    relatedSkillId: 'cap-system-data-analysis',
     bossName: '数据洞察巨兽',
     bossProgress: 12,
     stage: 1,
@@ -121,7 +121,7 @@ export const PRESET_TASKS: IQuestTask[] = [
     difficulty: 'easy',
     estimatedMinutes: 300,
     actualMinutes: 280,
-    relatedSkillId: 'skill-python',
+    relatedSkillId: 'cap-creation-tech-programming',
     parentId: 'epic-python-data',
     bossProgress: 95,
     stage: 1,
@@ -144,7 +144,7 @@ export const PRESET_TASKS: IQuestTask[] = [
     difficulty: 'easy',
     estimatedMinutes: 15,
     actualMinutes: 0,
-    relatedSkillId: 'skill-health',
+    relatedSkillId: 'cap-meta-self-focus',
     bossProgress: 0,
     stage: 0,
     status: 'active',
@@ -164,7 +164,7 @@ export const PRESET_TASKS: IQuestTask[] = [
     difficulty: 'easy',
     estimatedMinutes: 30,
     actualMinutes: 0,
-    relatedSkillId: 'skill-frontend',
+    relatedSkillId: 'cap-meta-learning-input',
     bossProgress: 0,
     stage: 0,
     status: 'active',
@@ -184,7 +184,7 @@ export const PRESET_TASKS: IQuestTask[] = [
     difficulty: 'easy',
     estimatedMinutes: 20,
     actualMinutes: 20,
-    relatedSkillId: 'skill-english',
+    relatedSkillId: 'cap-meta-learning-deep',
     bossProgress: 100,
     stage: 0,
     status: 'completed',
@@ -205,7 +205,7 @@ export const PRESET_TASKS: IQuestTask[] = [
     difficulty: 'normal',
     estimatedMinutes: 45,
     actualMinutes: 0,
-    relatedSkillId: 'skill-health',
+    relatedSkillId: 'cap-meta-self-focus',
     bossProgress: 0,
     stage: 0,
     status: 'pending',
@@ -219,330 +219,342 @@ export const PRESET_TASKS: IQuestTask[] = [
   },
 ];
 
-// ========== 预设技能树 ==========
-// 放射状布局：中心根节点，5 大类向外辐射
-// 画布尺寸参考: 1000 x 800，中心 (500, 400)
-export const PRESET_SKILLS: ISkillNode[] = [
-  // Level 0 - 根节点
-  {
-    id: 'skill-root',
-    name: '冒险者核心',
-    description: '所有技能的根源，代表你作为冒险者的综合能力。',
+// ========== 预设能力树 ==========
+type CapabilitySeedNode = {
+  id: string;
+  name: string;
+  description: string;
+  children?: CapabilitySeedNode[];
+};
+
+const CAPABILITY_ROOT_ID = 'skill-root';
+const CAPABILITY_CENTER = { x: 500, y: 400 };
+const now = Date.now();
+
+function seedProgress(status: ISkillNode['status']) {
+  if (status === 'enhanced') return { experience: 520, proficiencyLevel: 2 };
+  if (status === 'unlocked') return { experience: 120, proficiencyLevel: 1 };
+  return { experience: 0, proficiencyLevel: 0 };
+}
+
+function polarPosition(angleDeg: number, radius: number) {
+  const rad = (angleDeg * Math.PI) / 180;
+  return {
+    x: Math.round(CAPABILITY_CENTER.x + Math.cos(rad) * radius),
+    y: Math.round(CAPABILITY_CENTER.y + Math.sin(rad) * radius),
+  };
+}
+
+function createCapabilityTree() {
+  const nodes: ISkillNode[] = [];
+  const unlockedIds = new Set([
+    CAPABILITY_ROOT_ID,
+    'cap-meta',
+    'cap-creation',
+    'cap-system',
+    'cap-influence',
+    'cap-meta-thinking',
+    'cap-meta-learning',
+    'cap-meta-self',
+    'cap-creation-tech',
+    'cap-system-design',
+    'cap-meta-thinking-structured',
+    'cap-meta-learning-deep',
+    'cap-meta-self-focus',
+    'cap-creation-tech-programming',
+    'cap-creation-tech-software',
+    'cap-creation-tech-frontend',
+    'cap-system-design-architecture',
+  ]);
+  const enhancedIds = new Set(['cap-creation-tech-frontend']);
+
+  const roots: Array<CapabilitySeedNode & { category: string; angle: number }> = [
+    {
+      id: 'cap-meta',
+      name: '元能力',
+      description: '决定学习、思考、管理与判断质量的底层能力。',
+      category: '元能力',
+      angle: -90,
+      children: [
+        {
+          id: 'cap-meta-thinking',
+          name: '思考能力',
+          description: '将复杂问题抽象、结构化并形成判断的能力。',
+          children: [
+            { id: 'cap-meta-thinking-abstract', name: '问题抽象', description: '识别本质问题并抽离表象。' },
+            { id: 'cap-meta-thinking-structured', name: '结构化思考', description: '把复杂内容拆成清晰结构。' },
+            { id: 'cap-meta-thinking-first', name: '第一性原理', description: '回到底层约束重新思考。' },
+            { id: 'cap-meta-thinking-decision', name: '决策判断', description: '在不确定中做出高质量选择。' },
+          ],
+        },
+        {
+          id: 'cap-meta-learning',
+          name: '学习能力',
+          description: '获取、理解、连接并转化知识的能力。',
+          children: [
+            { id: 'cap-meta-learning-input', name: '信息获取', description: '高效找到可靠信息源。' },
+            { id: 'cap-meta-learning-deep', name: '深度理解', description: '把知识学透而不是只停留在表面。' },
+            { id: 'cap-meta-learning-connect', name: '知识连接', description: '把分散知识组织成体系。' },
+            { id: 'cap-meta-learning-expression', name: '输出表达', description: '用自己的话准确讲出来。' },
+            { id: 'cap-meta-learning-transfer', name: '实践转化', description: '把知识转成真实行动与结果。' },
+          ],
+        },
+        {
+          id: 'cap-meta-self',
+          name: '自我管理',
+          description: '围绕目标、专注、节奏与复盘的自我调度能力。',
+          children: [
+            { id: 'cap-meta-self-goal', name: '目标管理', description: '明确方向并持续推进。' },
+            { id: 'cap-meta-self-priority', name: '优先级判断', description: '识别当前最值得投入的事情。' },
+            { id: 'cap-meta-self-time', name: '时间估算', description: '更准确地估计任务耗时。' },
+            { id: 'cap-meta-self-focus', name: '专注能力', description: '维持深度专注并减少切换损耗。' },
+            { id: 'cap-meta-self-review', name: '复盘优化', description: '从结果中提炼经验并改进。' },
+          ],
+        },
+      ],
+    },
+    {
+      id: 'cap-creation',
+      name: '创造能力',
+      description: '把想法变成产品、系统与实际产出的能力。',
+      category: '创造能力',
+      angle: -18,
+      children: [
+        {
+          id: 'cap-creation-tech',
+          name: '技术创造',
+          description: '用工程方法构建真实可用的软件与系统。',
+          children: [
+            { id: 'cap-creation-tech-programming', name: '编程基础', description: '编程语言、数据结构与基础抽象能力。' },
+            { id: 'cap-creation-tech-software', name: '软件工程', description: '工程结构、协作、质量与可维护性。' },
+            { id: 'cap-creation-tech-backend', name: '后端开发', description: '服务端接口、业务逻辑与数据处理能力。' },
+            { id: 'cap-creation-tech-frontend', name: '前端开发', description: '界面、交互与客户端工程能力。' },
+            { id: 'cap-creation-tech-devops', name: 'DevOps', description: '部署、自动化、监控与交付能力。' },
+          ],
+        },
+        {
+          id: 'cap-creation-ai',
+          name: 'AI创造',
+          description: '用 AI/LLM 构建新工具、新流程与新体验。',
+          children: [
+            { id: 'cap-creation-ai-basic', name: 'AI基础', description: '理解 AI 的基本概念、能力边界与适用场景。' },
+            { id: 'cap-creation-ai-llm', name: 'LLM理解', description: '理解大模型的工作方式与上下文特性。' },
+            { id: 'cap-creation-ai-prompt', name: 'Prompt Engineering', description: '设计高质量提示词与交互结构。' },
+            { id: 'cap-creation-ai-rag', name: 'RAG', description: '构建检索增强生成能力。' },
+            { id: 'cap-creation-ai-agent', name: 'Agent', description: '构建具备目标、工具与执行能力的代理系统。' },
+            { id: 'cap-creation-ai-workflow', name: 'AI Workflow', description: '把 AI 能力编排进真实工作流。' },
+          ],
+        },
+        {
+          id: 'cap-creation-product',
+          name: '产品创造',
+          description: '把需求洞察转为可验证的产品方案与迭代路径。',
+          children: [
+            { id: 'cap-creation-product-needs', name: '用户需求分析', description: '识别用户问题与价值点。' },
+            { id: 'cap-creation-product-design', name: '产品设计', description: '定义产品结构、功能与价值链路。' },
+            { id: 'cap-creation-product-prototype', name: '原型设计', description: '快速表达方案并验证交互。' },
+            { id: 'cap-creation-product-ux', name: '用户体验', description: '提升理解成本、流畅度与满意度。' },
+            { id: 'cap-creation-product-iteration', name: '产品迭代', description: '基于反馈持续优化产品。' },
+          ],
+        },
+      ],
+    },
+    {
+      id: 'cap-system',
+      name: '系统能力',
+      description: '面向复杂系统的结构设计、数据治理与闭环优化能力。',
+      category: '系统能力',
+      angle: 54,
+      children: [
+        {
+          id: 'cap-system-design',
+          name: '系统设计',
+          description: '构建清晰、稳健且可扩展的系统结构。',
+          children: [
+            { id: 'cap-system-design-architecture', name: '架构设计', description: '定义系统整体结构与边界。' },
+            { id: 'cap-system-design-modules', name: '模块拆分', description: '把复杂系统切分为稳定模块。' },
+            { id: 'cap-system-design-dataflow', name: '数据流设计', description: '设计信息与状态在系统中的流动。' },
+            { id: 'cap-system-design-scale', name: '扩展性设计', description: '为增长、变化与复用留出空间。' },
+          ],
+        },
+        {
+          id: 'cap-system-data',
+          name: '数据能力',
+          description: '围绕数据建模、存储、分析与治理的能力。',
+          children: [
+            { id: 'cap-system-data-model', name: '数据模型', description: '把现实世界抽象为稳定数据结构。' },
+            { id: 'cap-system-data-db', name: '数据库设计', description: '设计可靠的数据存储与查询结构。' },
+            { id: 'cap-system-data-analysis', name: '数据分析', description: '从数据中提炼可行动洞察。' },
+            { id: 'cap-system-data-info', name: '信息管理', description: '组织、沉淀与检索信息资产。' },
+          ],
+        },
+        {
+          id: 'cap-system-opt',
+          name: '复杂系统优化',
+          description: '让流程、工具与协作形成高效闭环。',
+          children: [
+            { id: 'cap-system-opt-process', name: '流程优化', description: '识别关键瓶颈并优化流转效率。' },
+            { id: 'cap-system-opt-automation', name: '自动化', description: '用系统替代重复性工作。' },
+            { id: 'cap-system-opt-loop', name: '系统闭环设计', description: '把目标、执行、反馈与优化串起来。' },
+          ],
+        },
+      ],
+    },
+    {
+      id: 'cap-influence',
+      name: '影响能力',
+      description: '让价值被理解、被接受并带来协作与商业结果。',
+      category: '影响能力',
+      angle: 126,
+      children: [
+        {
+          id: 'cap-influence-expression',
+          name: '表达能力',
+          description: '把复杂内容讲清楚、讲明白、讲动人。',
+          children: [
+            { id: 'cap-influence-expression-writing', name: '技术写作', description: '把技术内容写得准确、清晰、可复用。' },
+            { id: 'cap-influence-expression-sharing', name: '知识分享', description: '把个人经验沉淀成他人可吸收的内容。' },
+            { id: 'cap-influence-expression-explain', name: '复杂概念解释', description: '降低理解门槛，让复杂内容变可懂。' },
+            { id: 'cap-influence-expression-story', name: 'Storytelling', description: '用叙事增强说服力与记忆点。' },
+          ],
+        },
+        {
+          id: 'cap-influence-collab',
+          name: '协作能力',
+          description: '在多角色场景中推动一致行动与结果达成。',
+          children: [
+            { id: 'cap-influence-collab-communication', name: '沟通', description: '准确传达信息并理解他人意图。' },
+            { id: 'cap-influence-collab-coordination', name: '协调', description: '推动多人、多事、多约束协同运转。' },
+            { id: 'cap-influence-collab-leadership', name: '领导', description: '在目标、方向与节奏上形成带动作用。' },
+          ],
+        },
+        {
+          id: 'cap-influence-business',
+          name: '商业能力',
+          description: '从价值、模式、成本与战略层理解决策。',
+          children: [
+            { id: 'cap-influence-business-value', name: '用户价值', description: '识别什么才是真正有价值的输出。' },
+            { id: 'cap-influence-business-model', name: '商业模式', description: '理解价值创造、传递与变现方式。' },
+            { id: 'cap-influence-business-cost', name: '成本收益分析', description: '平衡投入、回报与机会成本。' },
+            { id: 'cap-influence-business-strategy', name: '战略判断', description: '从长期与全局视角做判断。' },
+          ],
+        },
+      ],
+    },
+    {
+      id: 'cap-innovation',
+      name: '创新能力',
+      description: '在跨领域连接中形成新想法，并快速验证成形。',
+      category: '创新能力',
+      angle: 198,
+      children: [
+        { id: 'cap-innovation-cross', name: '跨领域连接', description: '把不同领域知识连接出新可能。' },
+        { id: 'cap-innovation-idea', name: '新想法产生', description: '持续提出值得实验的新方向。' },
+        { id: 'cap-innovation-experiment', name: '快速实验', description: '快速验证想法而不是停留在构想。' },
+        { id: 'cap-innovation-prototype', name: '原型开发', description: '把新想法尽快变成可感知的原型。' },
+        { id: 'cap-innovation-product', name: '创造个人产品', description: '把个人能力组合成可持续的作品或产品。' },
+      ],
+    },
+  ];
+
+  nodes.push({
+    id: CAPABILITY_ROOT_ID,
+    name: '个人成长能力树',
+    description: '围绕思考、创造、系统、影响与创新构建你的个人成长能力图谱。',
     category: '核心',
     level: 0,
     status: 'unlocked',
-    x: 500,
-    y: 400,
-    icon: '⭐',
+    x: CAPABILITY_CENTER.x,
+    y: CAPABILITY_CENTER.y,
+    icon: '🌟',
     requiredSkillPoints: 0,
-    unlockedAt: Date.now() - 86400000 * 30,
-  },
+    unlockedAt: now - 86400000 * 30,
+    ...seedProgress('unlocked'),
+    lastImprovedAt: now - 86400000 * 3,
+  });
 
-  // ===== Level 1 - 五大类 =====
-  // 编程 (上方, -90°)
-  {
-    id: 'skill-programming',
-    name: '编程',
-    description: '软件开发与编程能力，包含前端、后端、数据等方向。',
-    category: '编程',
-    parentId: 'skill-root',
-    level: 1,
-    status: 'unlocked',
-    x: 500,
-    y: 240,
-    icon: '💻',
-    requiredSkillPoints: 1,
-    unlockedAt: Date.now() - 86400000 * 20,
-  },
-  // 设计 (右上, -18°)
-  {
-    id: 'skill-design',
-    name: '设计',
-    description: '视觉设计与用户体验能力，包含 UI、UX、插画等方向。',
-    category: '设计',
-    parentId: 'skill-root',
-    level: 1,
-    status: 'unlocked',
-    x: 635,
-    y: 295,
-    icon: '🎨',
-    requiredSkillPoints: 1,
-    unlockedAt: Date.now() - 86400000 * 15,
-  },
-  // 语言 (右下, 54°)
-  {
-    id: 'skill-language',
-    name: '语言',
-    description: '外语学习与沟通能力，包含英语、日语等多语种。',
-    category: '语言',
-    parentId: 'skill-root',
-    level: 1,
-    status: 'locked',
-    x: 635,
-    y: 505,
-    icon: '🌍',
-    requiredSkillPoints: 1,
-  },
-  // 商业 (左下, 126°)
-  {
-    id: 'skill-business',
-    name: '商业',
-    description: '商业思维与运营能力，包含营销、管理、财务等方向。',
-    category: '商业',
-    parentId: 'skill-root',
-    level: 1,
-    status: 'locked',
-    x: 365,
-    y: 505,
-    icon: '💼',
-    requiredSkillPoints: 1,
-  },
-  // 生活 (左上, 198°)
-  {
-    id: 'skill-life',
-    name: '生活技能',
-    description: '日常生活与自我管理能力，包含健康、理财、厨艺等。',
-    category: '生活',
-    parentId: 'skill-root',
-    level: 1,
-    status: 'unlocked',
-    x: 365,
-    y: 295,
-    icon: '🌱',
-    requiredSkillPoints: 1,
-    unlockedAt: Date.now() - 86400000 * 25,
-  },
+  roots.forEach((root, rootIndex) => {
+    const rootPos = polarPosition(root.angle, 170);
+    const rootStatus = unlockedIds.has(root.id) ? 'unlocked' : 'locked';
+    nodes.push({
+      id: root.id,
+      name: root.name,
+      description: root.description,
+      category: root.category,
+      parentId: CAPABILITY_ROOT_ID,
+      level: 1,
+      status: rootStatus,
+      x: rootPos.x,
+      y: rootPos.y,
+      requiredSkillPoints: 1,
+      unlockedAt: rootStatus !== 'locked' ? now - 86400000 * (20 - rootIndex) : undefined,
+      ...seedProgress(rootStatus),
+      lastImprovedAt: rootStatus !== 'locked' ? now - 86400000 * (6 - (rootIndex % 3)) : undefined,
+    });
 
-  // ===== Level 2 - 子类：编程分支 =====
-  {
-    id: 'skill-frontend',
-    name: '前端开发',
-    description: 'Web 前端开发能力，HTML/CSS/JS 及主流框架。',
-    category: '编程',
-    parentId: 'skill-programming',
-    level: 2,
-    status: 'unlocked',
-    x: 410,
-    y: 130,
-    icon: '🌐',
-    requiredSkillPoints: 2,
-    unlockedAt: Date.now() - 86400000 * 10,
-  },
-  {
-    id: 'skill-backend',
-    name: '后端开发',
-    description: '服务端开发能力，API 设计、数据库、架构。',
-    category: '编程',
-    parentId: 'skill-programming',
-    level: 2,
-    status: 'locked',
-    x: 500,
-    y: 110,
-    icon: '⚙️',
-    requiredSkillPoints: 2,
-  },
-  {
-    id: 'skill-data',
-    name: '数据科学',
-    description: '数据分析与机器学习能力，数据处理、可视化、建模。',
-    category: '编程',
-    parentId: 'skill-programming',
-    level: 2,
-    status: 'locked',
-    x: 590,
-    y: 130,
-    icon: '📊',
-    requiredSkillPoints: 2,
-  },
+    const children = root.children ?? [];
+    const childSpan = Math.max(36, children.length * 16);
+    children.forEach((child, childIndex) => {
+      const childAngle =
+        children.length === 1
+          ? root.angle
+          : root.angle - childSpan / 2 + (childSpan / Math.max(children.length - 1, 1)) * childIndex;
+      const childPos = polarPosition(childAngle, 285);
+      const childStatus = unlockedIds.has(child.id) ? 'unlocked' : 'locked';
+      nodes.push({
+        id: child.id,
+        name: child.name,
+        description: child.description,
+        category: root.category,
+        parentId: root.id,
+        level: 2,
+        status: childStatus,
+        x: childPos.x,
+        y: childPos.y,
+        requiredSkillPoints: 2,
+        unlockedAt: childStatus !== 'locked' ? now - 86400000 * (10 - childIndex) : undefined,
+        ...seedProgress(childStatus),
+        lastImprovedAt: childStatus !== 'locked' ? now - 86400000 * (4 - (childIndex % 2)) : undefined,
+      });
 
-  // ===== Level 2 - 子类：设计分支 =====
-  {
-    id: 'skill-ui',
-    name: 'UI 设计',
-    description: '用户界面设计能力，视觉设计、组件系统、设计规范。',
-    category: '设计',
-    parentId: 'skill-design',
-    level: 2,
-    status: 'unlocked',
-    x: 740,
-    y: 215,
-    icon: '🖼️',
-    requiredSkillPoints: 2,
-    unlockedAt: Date.now() - 86400000 * 8,
-  },
-  {
-    id: 'skill-ux',
-    name: 'UX 设计',
-    description: '用户体验设计能力，用户研究、交互设计、可用性测试。',
-    category: '设计',
-    parentId: 'skill-design',
-    level: 2,
-    status: 'locked',
-    x: 760,
-    y: 305,
-    icon: '🧭',
-    requiredSkillPoints: 2,
-  },
+      const leaves = child.children ?? [];
+      if (leaves.length === 0) return;
 
-  // ===== Level 2 - 子类：语言分支 =====
-  {
-    id: 'skill-english',
-    name: '英语',
-    description: '英语听说读写能力，日常沟通与专业阅读。',
-    category: '语言',
-    parentId: 'skill-language',
-    level: 2,
-    status: 'locked',
-    x: 760,
-    y: 495,
-    icon: '🇺🇸',
-    requiredSkillPoints: 2,
-  },
-  {
-    id: 'skill-japanese',
-    name: '日语',
-    description: '日语听说读写能力，N2/N1 等级目标。',
-    category: '语言',
-    parentId: 'skill-language',
-    level: 2,
-    status: 'locked',
-    x: 740,
-    y: 585,
-    icon: '🇯🇵',
-    requiredSkillPoints: 2,
-  },
+      const leafSpan = Math.max(42, leaves.length * 12);
+      leaves.forEach((leaf, leafIndex) => {
+        const leafAngle =
+          leaves.length === 1
+            ? childAngle
+            : childAngle - leafSpan / 2 + (leafSpan / Math.max(leaves.length - 1, 1)) * leafIndex;
+        const leafPos = polarPosition(leafAngle, 400);
+        const leafStatus = enhancedIds.has(leaf.id)
+          ? 'enhanced'
+          : unlockedIds.has(leaf.id)
+            ? 'unlocked'
+            : 'locked';
+        nodes.push({
+          id: leaf.id,
+          name: leaf.name,
+          description: leaf.description,
+          category: root.category,
+          parentId: child.id,
+          level: 3,
+          status: leafStatus,
+          x: leafPos.x,
+          y: leafPos.y,
+          requiredSkillPoints: 3,
+          unlockedAt: leafStatus !== 'locked' ? now - 86400000 * (5 - (leafIndex % 3)) : undefined,
+          ...seedProgress(leafStatus),
+          lastImprovedAt: leafStatus !== 'locked' ? now - 86400000 * (2 - (leafIndex % 2)) : undefined,
+        });
+      });
+    });
+  });
 
-  // ===== Level 2 - 子类：商业分支 =====
-  {
-    id: 'skill-marketing',
-    name: '市场营销',
-    description: '市场推广与品牌运营能力，内容营销、增长黑客。',
-    category: '商业',
-    parentId: 'skill-business',
-    level: 2,
-    status: 'locked',
-    x: 240,
-    y: 495,
-    icon: '📢',
-    requiredSkillPoints: 2,
-  },
-  {
-    id: 'skill-management',
-    name: '项目管理',
-    description: '项目与团队管理能力，敏捷开发、风险管理。',
-    category: '商业',
-    parentId: 'skill-business',
-    level: 2,
-    status: 'locked',
-    x: 260,
-    y: 585,
-    icon: '📋',
-    requiredSkillPoints: 2,
-  },
+  return nodes;
+}
 
-  // ===== Level 2 - 子类：生活分支 =====
-  {
-    id: 'skill-health',
-    name: '健康管理',
-    description: '身体健康与运动能力，健身、饮食、睡眠管理。',
-    category: '生活',
-    parentId: 'skill-life',
-    level: 2,
-    status: 'unlocked',
-    x: 260,
-    y: 215,
-    icon: '💪',
-    requiredSkillPoints: 2,
-    unlockedAt: Date.now() - 86400000 * 18,
-  },
-  {
-    id: 'skill-finance',
-    name: '理财',
-    description: '个人财务管理能力，储蓄、投资、消费规划。',
-    category: '生活',
-    parentId: 'skill-life',
-    level: 2,
-    status: 'locked',
-    x: 240,
-    y: 305,
-    icon: '💰',
-    requiredSkillPoints: 2,
-  },
-
-  // ===== Level 3 - 细类：前端分支 =====
-  {
-    id: 'skill-react',
-    name: 'React',
-    description: 'React 框架精通，Hooks、状态管理、性能优化。',
-    category: '编程',
-    parentId: 'skill-frontend',
-    level: 3,
-    status: 'enhanced',
-    x: 350,
-    y: 50,
-    icon: '⚛️',
-    requiredSkillPoints: 3,
-    unlockedAt: Date.now() - 86400000 * 5,
-  },
-  {
-    id: 'skill-css',
-    name: 'CSS 大师',
-    description: 'CSS 高级技巧，动画、布局、响应式设计。',
-    category: '编程',
-    parentId: 'skill-frontend',
-    level: 3,
-    status: 'locked',
-    x: 450,
-    y: 30,
-    icon: '🎭',
-    requiredSkillPoints: 3,
-  },
-
-  // ===== Level 3 - 细类：后端分支 =====
-  {
-    id: 'skill-python',
-    name: 'Python',
-    description: 'Python 编程语言精通，脚本、Web、数据处理。',
-    category: '编程',
-    parentId: 'skill-backend',
-    level: 3,
-    status: 'locked',
-    x: 500,
-    y: 20,
-    icon: '🐍',
-    requiredSkillPoints: 3,
-  },
-
-  // ===== Level 3 - 细类：UI 设计分支 =====
-  {
-    id: 'skill-figma',
-    name: 'Figma 精通',
-    description: 'Figma 设计工具高级使用，组件库、自动布局、插件开发。',
-    category: '设计',
-    parentId: 'skill-ui',
-    level: 3,
-    status: 'locked',
-    x: 830,
-    y: 140,
-    icon: '🎯',
-    requiredSkillPoints: 3,
-  },
-
-  // ===== Level 3 - 细类：健康分支 =====
-  {
-    id: 'skill-fitness',
-    name: '健身达人',
-    description: '系统健身训练能力，力量、耐力、柔韧性全面发展。',
-    category: '生活',
-    parentId: 'skill-health',
-    level: 3,
-    status: 'locked',
-    x: 170,
-    y: 140,
-    icon: '🏋️',
-    requiredSkillPoints: 3,
-  },
-];
+export const PRESET_SKILLS: ISkillNode[] = createCapabilityTree();
 
 // ========== 预设商店商品 ==========
 export const PRESET_SHOP_ITEMS: IShopItem[] = [

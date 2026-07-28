@@ -397,7 +397,7 @@ export default function StatsPage() {
         </motion.div>
       </div>
 
-      {/* 专注时长趋势 + 技能成长 */}
+      {/* 专注时长趋势 + 能力成长 */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* 专注时长折线图 */}
         <motion.div
@@ -423,7 +423,7 @@ export default function StatsPage() {
           </Card>
         </motion.div>
 
-        {/* 技能成长概览 */}
+        {/* 能力成长概览 */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -433,7 +433,7 @@ export default function StatsPage() {
             <CardHeader className="pb-2">
               <CardTitle className="text-base font-semibold flex items-center gap-2">
                 <Star className="h-4 w-4 text-primary" />
-                技能成长
+                能力成长
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -442,13 +442,13 @@ export default function StatsPage() {
                   <p className="text-2xl font-bold text-primary tabular-nums">
                     {unlockedSkills.length}
                   </p>
-                  <p className="text-[11px] text-muted-foreground mt-0.5">已点亮技能</p>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">已点亮能力</p>
                 </div>
                 <div className="rounded-lg border border-border/40 bg-secondary/30 p-3 text-center">
                   <p className="text-2xl font-bold text-accent tabular-nums">
                     {skillPoints}
                   </p>
-                  <p className="text-[11px] text-muted-foreground mt-0.5">可用技能点</p>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">可用能力点</p>
                 </div>
               </div>
 

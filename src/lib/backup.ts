@@ -334,11 +334,11 @@ export function validateData(data?: IDataSnapshot): ValidationResult {
 
   const skillsRaw = snapshot['__quest_guild_skills'];
   if (skillsRaw === undefined) {
-    errors.push('技能树数据缺失');
+    errors.push('能力树数据缺失');
   } else {
     const skills = safeParse(skillsRaw, null as unknown[] | null);
     if (skills === null || !Array.isArray(skills)) {
-      errors.push('技能树数据格式损坏');
+      errors.push('能力树数据格式损坏');
     }
   }
 

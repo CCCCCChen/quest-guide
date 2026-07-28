@@ -89,7 +89,10 @@ db.exec(`
     y REAL NOT NULL,
     icon TEXT,
     requiredSkillPoints INTEGER NOT NULL,
-    unlockedAt INTEGER
+    unlockedAt INTEGER,
+    proficiencyLevel INTEGER DEFAULT 0,
+    experience INTEGER DEFAULT 0,
+    lastImprovedAt INTEGER
   );
 
   CREATE TABLE IF NOT EXISTS shop_items (
@@ -122,6 +125,16 @@ db.exec(`
 try {
   db.prepare('ALTER TABLE tasks ADD COLUMN stage INTEGER DEFAULT 1').run();
 } catch (e) { /* 已存在则忽略 */ }
+
+try {
+  db.prepare('ALTER TABLE skills ADD COLUMN proficiencyLevel INTEGER DEFAULT 0').run();
+} catch (e) { /* ignore */ }
+try {
+  db.prepare('ALTER TABLE skills ADD COLUMN experience INTEGER DEFAULT 0').run();
+} catch (e) { /* ignore */ }
+try {
+  db.prepare('ALTER TABLE skills ADD COLUMN lastImprovedAt INTEGER').run();
+} catch (e) { /* ignore */ }
 
 // 初始化默认数据
 const initMeta = db.prepare('INSERT OR IGNORE INTO meta (key, value) VALUES (?, ?)');
@@ -465,8 +478,8 @@ app.get('/api/skills', (req, res) => {
 app.post('/api/skills/batch-init', (req, res) => {
   const skills = req.body;
   const insert = db.prepare(`INSERT OR IGNORE INTO skills 
-    (id, name, description, category, parentId, level, status, x, y, icon, requiredSkillPoints, unlockedAt)
-    VALUES (@id, @name, @description, @category, @parentId, @level, @status, @x, @y, @icon, @requiredSkillPoints, @unlockedAt)`);
+    (id, name, description, category, parentId, level, status, x, y, icon, requiredSkillPoints, unlockedAt, proficiencyLevel, experience, lastImprovedAt)
+    VALUES (@id, @name, @description, @category, @parentId, @level, @status, @x, @y, @icon, @requiredSkillPoints, @unlockedAt, @proficiencyLevel, @experience, @lastImprovedAt)`);
 
   const tx = db.transaction((list) => {
     for (const s of list) {
@@ -475,6 +488,9 @@ app.post('/api/skills/batch-init', (req, res) => {
         parentId: s.parentId || null,
         icon: s.icon || null,
         unlockedAt: s.unlockedAt || null,
+        proficiencyLevel: s.proficiencyLevel || 0,
+        experience: s.experience || 0,
+        lastImprovedAt: s.lastImprovedAt || null,
       });
     }
   });
@@ -484,16 +500,17 @@ app.post('/api/skills/batch-init', (req, res) => {
 
 // 新增单个技能
 app.post('/api/skills', (req, res) => {
-  const { id, name, description, category, parentId, level, x, y, icon, requiredSkillPoints, status } = req.body;
+  const { id, name, description, category, parentId, level, x, y, icon, requiredSkillPoints, status, proficiencyLevel, experience, lastImprovedAt } = req.body;
   if (!id || !name || !category) {
     return res.status(400).json({ error: 'id, name, category 必填' });
   }
   try {
     db.prepare(`INSERT INTO skills 
-      (id, name, description, category, parentId, level, status, x, y, icon, requiredSkillPoints, unlockedAt)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+      (id, name, description, category, parentId, level, status, x, y, icon, requiredSkillPoints, unlockedAt, proficiencyLevel, experience, lastImprovedAt)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
       id, name, description || '', category, parentId || null, level || 1, status || 'locked',
-      x || 0, y || 0, icon || null, requiredSkillPoints || 1, null
+      x || 0, y || 0, icon || null, requiredSkillPoints || 1, null,
+      proficiencyLevel || 0, experience || 0, lastImprovedAt || null
     );
     res.json({ success: true, id });
   } catch (e) {
@@ -504,7 +521,7 @@ app.post('/api/skills', (req, res) => {
 // 更新技能
 app.put('/api/skills/:id', (req, res) => {
   const { id } = req.params;
-  const fields = ['name', 'description', 'category', 'parentId', 'level', 'status', 'x', 'y', 'icon', 'requiredSkillPoints'];
+  const fields = ['name', 'description', 'category', 'parentId', 'level', 'status', 'x', 'y', 'icon', 'requiredSkillPoints', 'proficiencyLevel', 'experience', 'lastImprovedAt'];
   const updates = [];
   const values = [];
   for (const f of fields) {
@@ -534,8 +551,8 @@ app.post('/api/skills/import', (req, res) => {
   if (!Array.isArray(skills)) return res.status(400).json({ error: '需要数组格式' });
 
   const insert = db.prepare(`INSERT OR REPLACE INTO skills 
-    (id, name, description, category, parentId, level, status, x, y, icon, requiredSkillPoints, unlockedAt)
-    VALUES (@id, @name, @description, @category, @parentId, @level, @status, @x, @y, @icon, @requiredSkillPoints, @unlockedAt)`);
+    (id, name, description, category, parentId, level, status, x, y, icon, requiredSkillPoints, unlockedAt, proficiencyLevel, experience, lastImprovedAt)
+    VALUES (@id, @name, @description, @category, @parentId, @level, @status, @x, @y, @icon, @requiredSkillPoints, @unlockedAt, @proficiencyLevel, @experience, @lastImprovedAt)`);
 
   const tx = db.transaction((list) => {
     db.prepare('DELETE FROM skills').run();
@@ -546,6 +563,9 @@ app.post('/api/skills/import', (req, res) => {
         icon: s.icon || null,
         status: s.status || 'locked',
         unlockedAt: s.unlockedAt || null,
+        proficiencyLevel: s.proficiencyLevel || 0,
+        experience: s.experience || 0,
+        lastImprovedAt: s.lastImprovedAt || null,
       });
     }
   });

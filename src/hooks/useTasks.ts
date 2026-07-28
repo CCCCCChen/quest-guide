@@ -6,6 +6,7 @@ import { PRESET_TASKS, PRESET_FOCUS_LOGS } from '@/data/preset';
 import { playSound } from '@/lib/sound';
 import { store, subscribeStorageChange } from '@/lib/storage';
 import { tasksApi } from '@/api';
+import { grantCapabilityExperience } from '@/hooks/useSkills';
 
 const STORAGE_KEY_TASKS = '__quest_guild_tasks';
 const STORAGE_KEY_TRACK = '__quest_guild_active_track';
@@ -458,7 +459,12 @@ export function useTasks() {
 
       tasksApi.complete(taskId).catch(() => {});
 
-      toast.success(`🎉 任务完成！获得 ${task.rewardReputation} 声望${task.rewardSkillPoints > 0 ? ` + ${task.rewardSkillPoints} 技能点` : ''}`);
+      if (task.relatedSkillId) {
+        const minutes = actualMinutes > 0 ? actualMinutes : task.estimatedMinutes;
+        grantCapabilityExperience(task.relatedSkillId, minutes);
+      }
+
+      toast.success(`🎉 任务完成！获得 ${task.rewardReputation} 声望${task.rewardSkillPoints > 0 ? ` + ${task.rewardSkillPoints} 能力点` : ''}`);
 
       return {
         reputation: task.rewardReputation,

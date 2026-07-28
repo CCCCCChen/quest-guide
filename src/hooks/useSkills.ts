@@ -7,6 +7,7 @@ import { skillsApi } from '@/api';
 
 const SKILLS_KEY = '__quest_guild_skills';
 const SKILL_POINTS_KEY = '__quest_guild_skill_points';
+const CAPABILITY_TREE_MARKER_ID = 'cap-meta';
 
 let skillsCache: ISkillNode[] | null = null;
 let skillPointsCache: number | null = null;
@@ -14,10 +15,57 @@ const skillsListeners = new Set<(v: ISkillNode[]) => void>();
 const pointsListeners = new Set<(v: number) => void>();
 let initialized = false;
 
+const PROFICIENCY_THRESHOLDS = [0, 60, 180, 420, 900, 1800];
+
+function calcProficiencyLevel(totalMinutes: number): number {
+  for (let i = PROFICIENCY_THRESHOLDS.length - 1; i >= 0; i -= 1) {
+    if (totalMinutes >= PROFICIENCY_THRESHOLDS[i]) return i;
+  }
+  return 0;
+}
+
+function isLegacySkillTree(skills: ISkillNode[]): boolean {
+  if (skills.length === 0) return false;
+  const ids = new Set(skills.map((s) => s.id));
+  return !ids.has(CAPABILITY_TREE_MARKER_ID) || ids.has('skill-programming') || ids.has('skill-design');
+}
+
+export function grantCapabilityExperience(skillId: string, minutes: number) {
+  if (!skillId) return;
+  const delta = Math.max(0, Math.floor(minutes));
+  if (delta <= 0) return;
+  const base = skillsCache ?? loadSkills();
+  const now = Date.now();
+  const target = base.find((s) => s.id === skillId);
+  if (!target) return;
+  const next = base.map((s) => {
+    if (s.id !== skillId) return s;
+    const currentExp = s.experience ?? 0;
+    const newExp = currentExp + delta;
+    const newLevel = Math.min(5, calcProficiencyLevel(newExp));
+    return {
+      ...s,
+      experience: newExp,
+      proficiencyLevel: newLevel,
+      lastImprovedAt: now,
+    };
+  });
+
+  setSkillsValue(next);
+  skillsApi.update(skillId, {
+    experience: (next.find((n) => n.id === skillId)?.experience) ?? 0,
+    proficiencyLevel: (next.find((n) => n.id === skillId)?.proficiencyLevel) ?? 0,
+    lastImprovedAt: now,
+  }).catch(() => {});
+}
+
 function loadSkills(): ISkillNode[] {
   try {
     const raw = store.getItem(SKILLS_KEY);
-    if (raw) return JSON.parse(raw) as ISkillNode[];
+    if (raw) {
+      const parsed = JSON.parse(raw) as ISkillNode[];
+      return isLegacySkillTree(parsed) ? PRESET_SKILLS : parsed;
+    }
   } catch { /* ignore */ }
   return PRESET_SKILLS;
 }
@@ -49,8 +97,12 @@ async function syncFromServer() {
       skillsApi.getSkillPoints(),
     ]);
     if (skills.length === 0) {
-      // 服务端为空，初始化预设
+      // 服务端为空，初始化当前能力树预设
       await skillsApi.batchInit(PRESET_SKILLS);
+      setSkillsValue(PRESET_SKILLS);
+    } else if (isLegacySkillTree(skills)) {
+      // 旧版技能树自动升级为新版能力树
+      await skillsApi.import(PRESET_SKILLS);
       setSkillsValue(PRESET_SKILLS);
     } else {
       setSkillsValue(skills);
@@ -179,6 +231,7 @@ export function useSkills() {
     getSkillsByCategory,
     getUnlockedCount,
     addSkillPoints,
+    grantCapabilityExperience,
   };
 }
 

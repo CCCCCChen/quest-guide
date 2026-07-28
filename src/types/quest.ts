@@ -42,6 +42,9 @@ export interface ISkillNode {
   icon?: string;
   requiredSkillPoints: number;
   unlockedAt?: number;
+  proficiencyLevel?: number;
+  experience?: number;
+  lastImprovedAt?: number;
 }
 
 export interface IShopItem {

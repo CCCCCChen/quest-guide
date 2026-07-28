@@ -2,6 +2,7 @@ import { useState, useMemo, useRef, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   TreePine,
+  Brain,
   Sparkles,
   Lock,
   Zap,
@@ -13,36 +14,39 @@ import {
   RotateCcw,
   Target,
   Swords,
-  BookOpen,
-  Palette,
   Code2,
   Briefcase,
-  Home,
+  Lightbulb,
+  Megaphone,
+  GitBranch,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { Progress } from '@/components/ui/progress';
 import { useSkills } from '@/hooks/useSkills';
 import { useTasks } from '@/hooks/useTasks';
 import type { ISkillNode } from '@/types/quest';
 import { cn } from '@/lib/utils';
 
 const CATEGORY_ICONS: Record<string, typeof Code2> = {
-  编程: Code2,
-  设计: Palette,
-  语言: BookOpen,
-  商业: Briefcase,
-  生活技能: Home,
+  元能力: Brain,
+  创造能力: Code2,
+  系统能力: GitBranch,
+  影响能力: Megaphone,
+  创新能力: Lightbulb,
 };
 
 const CATEGORY_COLORS: Record<string, string> = {
-  编程: '#3BA3E0',
-  设计: '#9B59E6',
-  语言: '#4CAF7A',
-  商业: '#E8B34A',
-  生活技能: '#F29940',
+  元能力: '#7C9DFF',
+  创造能力: '#9B59E6',
+  系统能力: '#3BA3E0',
+  影响能力: '#E8B34A',
+  创新能力: '#F29940',
 };
+
+const PROFICIENCY_THRESHOLDS = [0, 60, 180, 420, 900, 1800];
 
 export default function SkillTreePage() {
   const { skills, skillPoints, unlockSkill, enhanceSkill } = useSkills();
@@ -203,6 +207,19 @@ export default function SkillTreePage() {
   const unlockedCount = skills.filter((s) => s.status !== 'locked').length;
   const enhancedCount = skills.filter((s) => s.status === 'enhanced').length;
 
+  const selectedProgress = useMemo(() => {
+    if (!selectedNode) return null;
+    const exp = selectedNode.experience ?? 0;
+    const lvl = Math.max(0, Math.min(5, selectedNode.proficiencyLevel ?? 0));
+    const currentBase = PROFICIENCY_THRESHOLDS[lvl] ?? 0;
+    const nextBase = PROFICIENCY_THRESHOLDS[Math.min(5, lvl + 1)] ?? currentBase;
+    const span = Math.max(1, nextBase - currentBase);
+    const inLevel = Math.max(0, exp - currentBase);
+    const pct = lvl >= 5 ? 100 : Math.max(0, Math.min(100, Math.round((inLevel / span) * 100)));
+    const last = selectedNode.lastImprovedAt ? new Date(selectedNode.lastImprovedAt).toLocaleString() : null;
+    return { exp, lvl, pct, nextBase, last };
+  }, [selectedNode]);
+
   return (
     <div className="space-y-6">
       {/* 顶部标题 + 统计 */}
@@ -213,10 +230,10 @@ export default function SkillTreePage() {
           </div>
           <div>
             <h1 className="text-2xl font-bold text-foreground tracking-wide">
-              全局技能树
+              个人成长能力树
             </h1>
             <p className="text-sm text-muted-foreground">
-              完成史诗任务点亮技能，构建你的冒险者成长图谱
+              围绕元能力、创造、系统、影响与创新，持续点亮你的成长路径
             </p>
           </div>
         </div>
@@ -224,7 +241,7 @@ export default function SkillTreePage() {
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2 rounded-lg border border-border/50 bg-card/60 px-4 py-2">
             <Sparkles className="h-4 w-4 text-accent" />
-            <span className="text-xs text-muted-foreground">技能点</span>
+            <span className="text-xs text-muted-foreground">能力点</span>
             <span className="text-lg font-bold text-accent tabular-nums">
               {skillPoints}
             </span>
@@ -239,7 +256,7 @@ export default function SkillTreePage() {
         </div>
       </div>
 
-      {/* 技能树主画布 */}
+      {/* 能力树主画布 */}
       <div className="relative overflow-hidden rounded-xl border border-border/60 bg-card/30">
         {/* 背景装饰 */}
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(232_179_74_0.05),transparent_60%)]" />
@@ -571,12 +588,37 @@ export default function SkillTreePage() {
 
                 <Separator className="bg-border/40" />
 
+                {selectedProgress && (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-muted-foreground">当前等级</span>
+                      <span className="text-sm font-semibold text-foreground tabular-nums">
+                        Lv.{selectedProgress.lvl}
+                      </span>
+                    </div>
+                    <Progress value={selectedProgress.pct} className="h-2 bg-secondary/60" />
+                    <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                      <span>经验 {selectedProgress.exp} min</span>
+                      {selectedProgress.lvl >= 5 ? (
+                        <span>已达最高等级</span>
+                      ) : (
+                        <span>下一等级 {selectedProgress.nextBase} min</span>
+                      )}
+                    </div>
+                    {selectedProgress.last && (
+                      <div className="text-[11px] text-muted-foreground">
+                        最近提升：{selectedProgress.last}
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* 解锁信息 */}
                 {selectedNode.status === 'locked' && (
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
                       <span className="text-xs text-muted-foreground">
-                        解锁所需技能点
+                        解锁所需能力点
                       </span>
                       <span className="text-sm font-semibold text-accent tabular-nums">
                         {selectedNode.requiredSkillPoints}
@@ -584,7 +626,7 @@ export default function SkillTreePage() {
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-xs text-muted-foreground">
-                        可用技能点
+                        可用能力点
                       </span>
                       <span
                         className={cn(
@@ -603,13 +645,13 @@ export default function SkillTreePage() {
                       onClick={handleUnlock}
                     >
                       <Zap className="h-4 w-4 mr-2" />
-                      解锁技能
+                      点亮能力
                     </Button>
                     {!canUnlock && (
                       <p className="text-[11px] text-muted-foreground text-center">
                         {selectedNode.parentId
-                          ? '需先点亮前置技能'
-                          : '技能点不足，完成史诗任务获取'}
+                          ? '需先点亮前置能力'
+                          : '能力点不足，完成史诗任务获取'}
                       </p>
                     )}
                   </div>
@@ -620,7 +662,7 @@ export default function SkillTreePage() {
                     <div className="flex items-center gap-2 rounded-md bg-success/10 p-2 border border-success/20">
                       <Sparkles className="h-4 w-4 text-success shrink-0" />
                       <span className="text-xs text-foreground">
-                        技能已点亮，继续成长可强化
+                        能力已点亮，继续成长可强化
                       </span>
                     </div>
                     <Button
@@ -629,7 +671,7 @@ export default function SkillTreePage() {
                       onClick={handleEnhance}
                     >
                       <Star className="h-4 w-4 mr-2 text-primary" />
-                      强化技能
+                      强化能力
                     </Button>
                   </div>
                 )}
@@ -704,7 +746,7 @@ export default function SkillTreePage() {
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <Card className="border-border/50 bg-card/40">
           <CardContent className="p-4">
-            <div className="text-xs text-muted-foreground mb-1">总技能数</div>
+            <div className="text-xs text-muted-foreground mb-1">总能力节点</div>
             <div className="text-2xl font-bold text-foreground tabular-nums">
               {totalSkills}
             </div>
@@ -728,7 +770,7 @@ export default function SkillTreePage() {
         </Card>
         <Card className="border-border/50 bg-card/40">
           <CardContent className="p-4">
-            <div className="text-xs text-muted-foreground mb-1">技能分类</div>
+            <div className="text-xs text-muted-foreground mb-1">能力分类</div>
             <div className="text-2xl font-bold text-success tabular-nums">
               {Object.keys(nodesByCategory).length}
             </div>
@@ -736,7 +778,7 @@ export default function SkillTreePage() {
         </Card>
         <Card className="border-border/50 bg-card/40">
           <CardContent className="p-4">
-            <div className="text-xs text-muted-foreground mb-1">可用技能点</div>
+            <div className="text-xs text-muted-foreground mb-1">可用能力点</div>
             <div className="text-2xl font-bold text-warning tabular-nums">
               {skillPoints}
             </div>

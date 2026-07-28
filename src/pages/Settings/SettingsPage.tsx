@@ -476,7 +476,7 @@ export default function SettingsPage() {
               <div>
                 <CardTitle className="text-base font-semibold">音效反馈</CardTitle>
                 <CardDescription className="text-xs">
-                  任务完成、技能点亮时的音效提示
+                  任务完成、能力点亮时的音效提示
                 </CardDescription>
               </div>
             </div>
@@ -739,7 +739,7 @@ export default function SettingsPage() {
                               <div className="rounded-md bg-secondary/40 p-3 text-xs space-y-1">
                                 <div>备份时间：{new Date(b.timestamp).toLocaleString()}</div>
                                 <div>任务数量：{b.stats.taskCount} 个</div>
-                                <div>技能数量：{b.stats.skillCount} 个</div>
+                                <div>能力节点：{b.stats.skillCount} 个</div>
                                 <div>公会声望：{b.stats.reputation.toLocaleString()}</div>
                                 <div>数据大小：{formatBytes(b.stats.totalBytes)}</div>
                               </div>
@@ -786,7 +786,7 @@ export default function SettingsPage() {
                       <p>此操作将永久删除以下数据，且无法恢复：</p>
                       <ul className="list-disc list-inside text-sm space-y-1 text-muted-foreground">
                         <li>所有任务与悬赏记录</li>
-                        <li>技能树进度与技能点</li>
+                        <li>能力树进度与能力点</li>
                         <li>公会声望与商店兑换记录</li>
                         <li>专注时长统计</li>
                         <li>个人设置偏好</li>
@@ -867,7 +867,7 @@ export default function SettingsPage() {
                     <div className="text-lg font-bold text-foreground tabular-nums">
                       {importPreview.stats.skillCount}
                     </div>
-                    <div className="text-[10px] text-muted-foreground">技能数</div>
+                    <div className="text-[10px] text-muted-foreground">能力数</div>
                   </div>
                   <div className="rounded-md border border-border/40 bg-secondary/30 p-3 text-center">
                     <div className="text-lg font-bold text-primary tabular-nums">
@@ -947,7 +947,7 @@ export default function SettingsPage() {
             </div>
             <p>
               一款以 RPG 游戏面板为视觉风格的轻量级目标管理工具。把人生目标变成史诗任务，
-              通过任务拆解、专注追踪、技能成长和可视化奖励，提升你的规划力与执行力。
+              通过任务拆解、专注追踪、能力成长和可视化奖励，提升你的规划力与执行力。
             </p>
             <p className="text-xs">
               所有数据存储在浏览器本地，不会上传到任何服务器。
