@@ -196,6 +196,44 @@ def insert_reflection():
     if res:
         print(f"  [OK] 复盘已创建: {res['id']}")
 
+def insert_skill():
+    print("\n--- 新建技能 ---")
+    name = input("  技能名称: ").strip()
+    if not name: return print("  已取消")
+    print("  分类: computer / math / ai / finance / fitness / business / meta")
+    category = input("  分类: ").strip()
+    if not category: return print("  已取消")
+
+    print("  关联父技能:")
+    list_skills()
+    parent_id = input("  父技能ID (可选): ").strip()
+
+    level_str = input("  等级 0-5 (默认 0): ").strip()
+    level = int(level_str) if level_str.isdigit() else 0
+
+    desc = input("  描述 (可选): ").strip()
+
+    sp_str = input("  解锁所需技能点 (默认 1): ").strip()
+    required_sp = int(sp_str) if sp_str.isdigit() else 1
+
+    x_str = input("  X坐标 (可选, 默认 0): ").strip()
+    x = float(x_str) if x_str else 0.0
+    y_str = input("  Y坐标 (可选, 默认 0): ").strip()
+    y = float(y_str) if y_str else 0.0
+
+    import sys; sys.path.insert(0, os.path.dirname(__file__))
+    from insert_api import Skill
+    res = Skill.insert(
+        name=name, category=category,
+        parent_id=parent_id or None,
+        level=level, description=desc,
+        required_sp=required_sp, x=x, y=y,
+    )
+    if res["ok"]:
+        print(f"  [OK] 技能已创建: {res['data']['id']}")
+    else:
+        print(f"  [失败] {res['error']}: {res.get('detail', '')}")
+
 def insert_shop_item():
     print("\n--- 新建商品 ---")
     name = input("  商品名称: ").strip()
@@ -253,6 +291,7 @@ MENU = """
   3) 插入任务
   4) 插入复盘
   5) 插入商店商品
+  6) 插入技能
   ─
   l) 查看已有目标
   p) 查看已有项目
@@ -272,6 +311,7 @@ def main():
         elif cmd == "3": insert_task()
         elif cmd == "4": insert_reflection()
         elif cmd == "5": insert_shop_item()
+        elif cmd == "6": insert_skill()
         elif cmd == "l": list_goals()
         elif cmd == "p": list_projects()
         elif cmd == "t": list_tasks()
