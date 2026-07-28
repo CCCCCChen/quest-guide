@@ -712,6 +712,8 @@ app.post('/api/skills/batch-init', (req, res) => {
   const insert = db.prepare(`INSERT OR IGNORE INTO skills 
     (id, name, description, category, parentId, level, status, x, y, icon, requiredSkillPoints, unlockedAt, proficiencyLevel, experience, lastImprovedAt)
     VALUES (@id, @name, @description, @category, @parentId, @level, @status, @x, @y, @icon, @requiredSkillPoints, @unlockedAt, @proficiencyLevel, @experience, @lastImprovedAt)`);
+    (id, name, description, category, parentId, level, status, x, y, icon, requiredSkillPoints, unlockedAt, proficiencyLevel, experience, lastImprovedAt)
+    VALUES (@id, @name, @description, @category, @parentId, @level, @status, @x, @y, @icon, @requiredSkillPoints, @unlockedAt, @proficiencyLevel, @experience, @lastImprovedAt)`);
 
   const tx = db.transaction((list) => {
     for (const s of list) {
@@ -720,6 +722,9 @@ app.post('/api/skills/batch-init', (req, res) => {
         parentId: s.parentId || null,
         icon: s.icon || null,
         unlockedAt: s.unlockedAt || null,
+        proficiencyLevel: s.proficiencyLevel || 0,
+        experience: s.experience || 0,
+        lastImprovedAt: s.lastImprovedAt || null,
         proficiencyLevel: s.proficiencyLevel || 0,
         experience: s.experience || 0,
         lastImprovedAt: s.lastImprovedAt || null,
@@ -733,6 +738,7 @@ app.post('/api/skills/batch-init', (req, res) => {
 // 新增单个技能
 app.post('/api/skills', (req, res) => {
   const { id, name, description, category, parentId, level, x, y, icon, requiredSkillPoints, status, proficiencyLevel, experience, lastImprovedAt } = req.body;
+  const { id, name, description, category, parentId, level, x, y, icon, requiredSkillPoints, status, proficiencyLevel, experience, lastImprovedAt } = req.body;
   if (!id || !name || !category) {
     return res.status(400).json({ error: 'id, name, category 必填' });
   }
@@ -740,7 +746,11 @@ app.post('/api/skills', (req, res) => {
     db.prepare(`INSERT INTO skills 
       (id, name, description, category, parentId, level, status, x, y, icon, requiredSkillPoints, unlockedAt, proficiencyLevel, experience, lastImprovedAt)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+      (id, name, description, category, parentId, level, status, x, y, icon, requiredSkillPoints, unlockedAt, proficiencyLevel, experience, lastImprovedAt)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
       id, name, description || '', category, parentId || null, level || 1, status || 'locked',
+      x || 0, y || 0, icon || null, requiredSkillPoints || 1, null,
+      proficiencyLevel || 0, experience || 0, lastImprovedAt || null
       x || 0, y || 0, icon || null, requiredSkillPoints || 1, null,
       proficiencyLevel || 0, experience || 0, lastImprovedAt || null
     );
@@ -753,6 +763,7 @@ app.post('/api/skills', (req, res) => {
 // 更新技能
 app.put('/api/skills/:id', (req, res) => {
   const { id } = req.params;
+  const fields = ['name', 'description', 'category', 'parentId', 'level', 'status', 'x', 'y', 'icon', 'requiredSkillPoints', 'proficiencyLevel', 'experience', 'lastImprovedAt'];
   const fields = ['name', 'description', 'category', 'parentId', 'level', 'status', 'x', 'y', 'icon', 'requiredSkillPoints', 'proficiencyLevel', 'experience', 'lastImprovedAt'];
   const updates = [];
   const values = [];
@@ -785,6 +796,8 @@ app.post('/api/skills/import', (req, res) => {
   const insert = db.prepare(`INSERT OR REPLACE INTO skills 
     (id, name, description, category, parentId, level, status, x, y, icon, requiredSkillPoints, unlockedAt, proficiencyLevel, experience, lastImprovedAt)
     VALUES (@id, @name, @description, @category, @parentId, @level, @status, @x, @y, @icon, @requiredSkillPoints, @unlockedAt, @proficiencyLevel, @experience, @lastImprovedAt)`);
+    (id, name, description, category, parentId, level, status, x, y, icon, requiredSkillPoints, unlockedAt, proficiencyLevel, experience, lastImprovedAt)
+    VALUES (@id, @name, @description, @category, @parentId, @level, @status, @x, @y, @icon, @requiredSkillPoints, @unlockedAt, @proficiencyLevel, @experience, @lastImprovedAt)`);
 
   const tx = db.transaction((list) => {
     db.prepare('DELETE FROM skills').run();
@@ -795,6 +808,9 @@ app.post('/api/skills/import', (req, res) => {
         icon: s.icon || null,
         status: s.status || 'locked',
         unlockedAt: s.unlockedAt || null,
+        proficiencyLevel: s.proficiencyLevel || 0,
+        experience: s.experience || 0,
+        lastImprovedAt: s.lastImprovedAt || null,
         proficiencyLevel: s.proficiencyLevel || 0,
         experience: s.experience || 0,
         lastImprovedAt: s.lastImprovedAt || null,
