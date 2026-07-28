@@ -1,6 +1,9 @@
 const { app, BrowserWindow, Tray, Menu, ipcMain, screen, nativeImage } = require('electron');
 const path = require('path');
 const http = require('http');
+const net = require('net');
+const { spawn } = require('child_process');
+const fs = require('fs');
 const Store = require('electron-store');
 
 // 初始化本地存储
@@ -28,9 +31,67 @@ const APP_CONFIG = {
 };
 
 const isDev = !app.isPackaged;
+let serverPort = Number(process.env.PORT || 3001);
+let serverProcess = null;
 
 if (process.env.NODE_ENV === 'development' || !app.isPackaged) {
   app.commandLine.appendSwitch('ignore-certificate-errors');
+}
+
+function checkPortAvailable(port) {
+  return new Promise((resolve) => {
+    const tester = net.createServer();
+    tester.once('error', () => resolve(false));
+    tester.once('listening', () => {
+      tester.close(() => resolve(true));
+    });
+    tester.listen(port, '127.0.0.1');
+  });
+}
+
+async function findAvailablePort(preferredPort) {
+  for (let p = preferredPort; p < preferredPort + 30; p += 1) {
+    const ok = await checkPortAvailable(p);
+    if (ok) return p;
+  }
+  return preferredPort;
+}
+
+async function ensureLocalServer() {
+  const entryInsideApp = path.join(__dirname, 'server', 'index.js');
+  const entryDev = path.join(__dirname, '..', 'server', 'index.js');
+  const serverEntry = fs.existsSync(entryInsideApp) ? entryInsideApp : entryDev;
+
+  const preferred = Number(process.env.QUEST_GUILD_SERVER_PORT || 3001);
+  const freePort = await findAvailablePort(preferred);
+  serverPort = freePort;
+
+  if (serverProcess && !serverProcess.killed) {
+    return;
+  }
+
+  serverProcess = spawn(process.execPath, [serverEntry], {
+    stdio: 'ignore',
+    env: {
+      ...process.env,
+      PORT: String(serverPort),
+      ELECTRON_RUN_AS_NODE: '1',
+    },
+    windowsHide: true,
+  });
+
+  serverProcess.on('exit', () => {
+    serverProcess = null;
+  });
+}
+
+function stopLocalServer() {
+  if (serverProcess && !serverProcess.killed) {
+    try {
+      serverProcess.kill();
+    } catch {}
+  }
+  serverProcess = null;
 }
 
 // 创建主窗口
@@ -114,7 +175,7 @@ function createFloatWindow() {
   if (isDev) {
     floatWindow.loadURL(`${APP_CONFIG.devUrl}?mode=floating`);
   } else {
-    floatWindow.loadFile(path.join(__dirname, 'renderer/float.html'));
+    floatWindow.loadFile(APP_CONFIG.mainHtmlPath, { query: { mode: 'floating' } });
   }
 
   // 初始收起状态，限制点击区域为顶部条
@@ -433,7 +494,7 @@ ipcMain.handle('api:proxy', async (_, { method, path, body }) => {
   return new Promise((resolve) => {
     const req = http.request({
       hostname: 'localhost',
-      port: 3001,
+      port: serverPort,
       path: '/api' + path,
       method: method || 'GET',
       headers: { 'Content-Type': 'application/json' },
@@ -453,6 +514,7 @@ ipcMain.handle('api:proxy', async (_, { method, path, body }) => {
 
 // 应用就绪
 app.whenReady().then(() => {
+  ensureLocalServer().catch(() => {});
   createMainWindow();
   createTray();
   
@@ -478,6 +540,7 @@ app.on('window-all-closed', () => {
 // 应用退出前
 app.on('before-quit', () => {
   isQuitting = true;
+  stopLocalServer();
 });
 
 // 开机自启（可选）

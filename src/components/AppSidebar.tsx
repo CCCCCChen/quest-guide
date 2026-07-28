@@ -10,12 +10,15 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
 } from '@/components/ui/sidebar';
-import { Scroll, Swords, TreePine, Store, BarChart3, Settings, Sparkles } from 'lucide-react';
+import { Scroll, Flag, FolderKanban, NotebookPen, Swords, TreePine, Store, BarChart3, Settings, Sparkles } from 'lucide-react';
 
 const NAV_ITEMS = [
   { path: '/', label: '今日任务', icon: Scroll },
+  { path: '/goals', label: '目标', icon: Flag },
+  { path: '/projects', label: '项目', icon: FolderKanban },
+  { path: '/reflections', label: '复盘', icon: NotebookPen },
   { path: '/quest-pool', label: '悬赏池', icon: Swords },
-  { path: '/skill-tree', label: '技能树', icon: TreePine },
+  { path: '/skill-tree', label: '能力树', icon: TreePine },
   { path: '/shop', label: '公会商店', icon: Store },
   { path: '/stats', label: '统计面板', icon: BarChart3 },
   { path: '/settings', label: '设置', icon: Settings },

@@ -11,6 +11,9 @@ export const tasksApi = {
     difficulty: TaskDifficulty;
     estimatedMinutes: number;
     relatedSkillId?: string;
+    goalId?: string;
+    projectId?: string;
+    capabilityIds?: string[];
     bossName?: string;
     parentId?: string;
     tags?: string[];

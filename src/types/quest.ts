@@ -1,9 +1,11 @@
-// EXPORTS: IQuestTask, ISkillNode, IShopItem, IManaConfig, IActiveTrack, IFocusLog, IRedemption, IAppSettings, TaskType, TaskDifficulty, TaskStatus, SkillStatus
+// EXPORTS: IQuestTask, ISkillNode, IShopItem, IGoal, IProject, IReflection, IManaConfig, IActiveTrack, IFocusLog, IRedemption, IAppSettings, TaskType, TaskDifficulty, TaskStatus, SkillStatus, GoalStatus, ProjectStatus
 
 export type TaskType = 'epic' | 'daily';
 export type TaskDifficulty = 'easy' | 'normal' | 'hard' | 'epic';
 export type TaskStatus = 'pending' | 'active' | 'completed';
 export type SkillStatus = 'locked' | 'unlocked' | 'enhanced';
+export type GoalStatus = 'active' | 'archived';
+export type ProjectStatus = 'active' | 'completed' | 'archived';
 
 export interface IQuestTask {
   id: string;
@@ -14,6 +16,9 @@ export interface IQuestTask {
   estimatedMinutes: number;
   actualMinutes: number;
   relatedSkillId?: string;
+  goalId?: string;
+  projectId?: string;
+  capabilityIds?: string[];
   bossName?: string;
   bossProgress: number;
   parentId?: string;
@@ -42,6 +47,9 @@ export interface ISkillNode {
   icon?: string;
   requiredSkillPoints: number;
   unlockedAt?: number;
+  proficiencyLevel?: number;
+  experience?: number;
+  lastImprovedAt?: number;
 }
 
 export interface IShopItem {
@@ -52,6 +60,38 @@ export interface IShopItem {
   color?: string;
   description?: string;
   source: 'mock' | 'user';
+  createdAt: number;
+}
+
+export interface IGoal {
+  id: string;
+  name: string;
+  description: string;
+  deadline?: number;
+  status: GoalStatus;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface IProject {
+  id: string;
+  goalId?: string;
+  name: string;
+  description: string;
+  capabilityIds: string[];
+  progress: number;
+  status: ProjectStatus;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface IReflection {
+  id: string;
+  taskId: string;
+  expectedResult: string;
+  actualResult: string;
+  lessonLearned: string;
+  nextAction: string;
   createdAt: number;
 }
 
@@ -89,6 +129,7 @@ export interface IFloatingPosition {
 }
 
 export interface IAppSettings {
+  appName: string;
   manaMax: number;
   resetTime: string;
   soundEnabled: boolean;

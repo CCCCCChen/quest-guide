@@ -1,0 +1,68 @@
+{
+  "name": "quest-guild",
+  "version": "1.0.0",
+  "description": "悬赏任务公会 - RPG游戏风格的目标管理工具",
+  "main": "main.js",
+  "author": "Quest Guild",
+  "license": "MIT",
+  "scripts": {
+    "start": "npm run build:renderer && electron .",
+    "build:renderer": "node scripts/build-renderer.mjs",
+    "prebuild": "node -e \"const cp=require('child_process');try{cp.execSync('rd /s /q release',{cwd:__dirname,stdio:'pipe'});console.log('已清理 release 目录');}catch(e){if(!e.message.includes('not'))console.log('清理跳过:',e.message.trim())}\"",
+    "retry-build": "node -e \"const cp=require('child_process');const p=require('path');const eb=p.join(__dirname,'node_modules','.bin','electron-builder.cmd');const args=process.argv.slice(2);for(let i=0;i<3;i++){const r=cp.spawnSync(eb,args,{cwd:__dirname,stdio:'inherit',shell:true,env:{...process.env,ELECTRON_BUILDER_CACHE:p.join(__dirname,'.electron-cache')}});if(r.status===0)process.exit(0);console.log('尝试 '+(i+1)+' 失败，'+(i<2?'3秒后重试...':'已达最大重试次数'));if(i<2)cp.execSync('timeout /t 3 /nobreak',{stdio:'inherit'});}process.exit(1);\" --",
+    "build": "npm run prebuild && npm run build:renderer && npm run retry-build",
+    "build:win": "npm run prebuild && npm run build:renderer && npm run retry-build -- --win",
+    "build:win64": "npm run prebuild && npm run build:renderer && npm run retry-build -- --win --x64",
+    "build:portable": "npm run prebuild && npm run build:renderer && npm run retry-build -- --win portable"
+  },
+  "devDependencies": {
+    "electron": "^28.0.0",
+    "electron-builder": "^24.9.1"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.3.0",
+    "cors": "^2.8.5",
+    "electron-store": "^8.1.0",
+    "express": "^4.19.2"
+  },
+  "build": {
+    "appId": "com.questguild.app",
+    "productName": "悬赏任务公会",
+    "electronDownload": {
+      "cache": ".electron-cache"
+    },
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "renderer/**/*",
+      "server/**/*",
+      "assets/**/*"
+    ],
+    "win": {
+      "signAndEditExecutable": false,
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        },
+        {
+          "target": "portable",
+          "arch": ["x64"]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "悬赏任务公会"
+    },
+    "portable": {
+      "artifactName": "悬赏任务公会-Portable.exe"
+    }
+  }
+}

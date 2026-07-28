@@ -1,5 +1,5 @@
 import { useCallback, useState, useEffect } from 'react';
-import { scopedStorage } from '@lark-apaas/client-toolkit-lite';
+import { appStorage } from '@/lib/runtime';
 
 export type DisplayMode = 'full' | 'floating';
 
@@ -8,7 +8,7 @@ const EVENT_NAME = 'quest-guild:mode-changed';
 
 function loadMode(): DisplayMode {
   try {
-    const raw = scopedStorage.getItem(STORAGE_KEY);
+    const raw = appStorage.getItem(STORAGE_KEY);
     if (raw === 'full' || raw === 'floating') return raw;
     return 'full';
   } catch {
@@ -18,7 +18,7 @@ function loadMode(): DisplayMode {
 
 function saveMode(mode: DisplayMode) {
   try {
-    scopedStorage.setItem(STORAGE_KEY, mode);
+    appStorage.setItem(STORAGE_KEY, mode);
   } catch {
     /* ignore */
   }

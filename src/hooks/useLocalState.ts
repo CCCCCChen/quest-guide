@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { scopedStorage } from '@lark-apaas/client-toolkit-lite';
-import { logger } from '@lark-apaas/client-toolkit-lite';
+import { appLogger, appStorage } from '@/lib/runtime';
 
 interface UseLocalStateOptions<T> {
   key: string;
@@ -13,7 +12,7 @@ function getInitialValue<T>(options: UseLocalStateOptions<T>): T {
   const { key, initialValue, version, validator } = options;
 
   try {
-    const raw = scopedStorage.getItem(key);
+    const raw = appStorage.getItem(key);
     if (raw === null || raw === undefined) {
       return typeof initialValue === 'function'
         ? (initialValue as () => T)()
@@ -25,14 +24,14 @@ function getInitialValue<T>(options: UseLocalStateOptions<T>): T {
     // 版本校验
     if (version !== undefined && parsed && typeof parsed === 'object' && '__v' in parsed) {
       if (parsed.__v !== version) {
-        logger.warn(`[useLocalState] version mismatch for ${key}, resetting`);
+        appLogger.warn(`[useLocalState] version mismatch for ${key}, resetting`);
         return typeof initialValue === 'function'
           ? (initialValue as () => T)()
           : initialValue;
       }
       const data = parsed.data;
       if (validator && !validator(data)) {
-        logger.warn(`[useLocalState] validator failed for ${key}, resetting`);
+        appLogger.warn(`[useLocalState] validator failed for ${key}, resetting`);
         return typeof initialValue === 'function'
           ? (initialValue as () => T)()
           : initialValue;
@@ -41,7 +40,7 @@ function getInitialValue<T>(options: UseLocalStateOptions<T>): T {
     }
 
     if (validator && !validator(parsed)) {
-      logger.warn(`[useLocalState] validator failed for ${key}, resetting`);
+      appLogger.warn(`[useLocalState] validator failed for ${key}, resetting`);
       return typeof initialValue === 'function'
         ? (initialValue as () => T)()
         : initialValue;
@@ -49,7 +48,7 @@ function getInitialValue<T>(options: UseLocalStateOptions<T>): T {
 
     return parsed as T;
   } catch (error) {
-    logger.error(`[useLocalState] read error for ${key}:`, String(error));
+    appLogger.error(`[useLocalState] read error for ${key}:`, String(error));
     return typeof initialValue === 'function'
       ? (initialValue as () => T)()
       : initialValue;
@@ -64,12 +63,12 @@ export function useLocalState<T>(options: UseLocalStateOptions<T>) {
   useEffect(() => {
     try {
       if (version !== undefined) {
-        scopedStorage.setItem(key, JSON.stringify({ __v: version, data: value }));
+        appStorage.setItem(key, JSON.stringify({ __v: version, data: value }));
       } else {
-        scopedStorage.setItem(key, JSON.stringify(value));
+        appStorage.setItem(key, JSON.stringify(value));
       }
     } catch (error) {
-      logger.error(`[useLocalState] write error for ${key}:`, String(error));
+      appLogger.error(`[useLocalState] write error for ${key}:`, String(error));
     }
   }, [key, version, value]);
 

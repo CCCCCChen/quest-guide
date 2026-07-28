@@ -48,6 +48,8 @@ import {
 import { Progress } from '@/components/ui/progress';
 import { toast } from 'sonner';
 import { useTasks } from '@/hooks/useTasks';
+import { useGoals } from '@/hooks/useGoals';
+import { useProjects } from '@/hooks/useProjects';
 import { useShop } from '@/hooks/useShop';
 import { useSettings } from '@/hooks/useSettings';
 import { formatDuration } from '@/lib/utils';
@@ -82,6 +84,8 @@ export default function TodayPage() {
     setTrackingTask,
     addAttentionTask,
   } = useTasks();
+  const { goals } = useGoals();
+  const { projects } = useProjects();
   const { addReputation } = useShop();
   const { settings } = useSettings();
 
@@ -98,6 +102,33 @@ export default function TodayPage() {
     () => tasks.filter((t) => t.status === 'pending' && !t.parentId),
     [tasks]
   );
+
+  const goalNameMap = useMemo(() => new Map(goals.map((g) => [g.id, g.name])), [goals]);
+  const projectNameMap = useMemo(() => new Map(projects.map((p) => [p.id, p.name])), [projects]);
+
+  const highestValueTask = useMemo(() => {
+    return [...pendingTasks].sort((a, b) => {
+      const aScore = a.rewardReputation + a.rewardSkillPoints * 20;
+      const bScore = b.rewardReputation + b.rewardSkillPoints * 20;
+      return bScore - aScore;
+    })[0];
+  }, [pendingTasks]);
+
+  const biggestGrowthTask = useMemo(() => {
+    return [...pendingTasks].sort((a, b) => {
+      const aScore =
+        (a.capabilityIds?.length || 0) * 30 +
+        (a.relatedSkillId ? 20 : 0) +
+        a.estimatedMinutes +
+        a.rewardSkillPoints * 50;
+      const bScore =
+        (b.capabilityIds?.length || 0) * 30 +
+        (b.relatedSkillId ? 20 : 0) +
+        b.estimatedMinutes +
+        b.rewardSkillPoints * 50;
+      return bScore - aScore;
+    })[0];
+  }, [pendingTasks]);
 
   const handleComplete = (task: IQuestTask) => {
     completeTask(task.id);
@@ -253,6 +284,35 @@ export default function TodayPage() {
           </DialogContent>
         </Dialog>
       </div>
+
+      {(highestValueTask || biggestGrowthTask) && (
+        <section className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+          {highestValueTask && (
+            <RecommendationCard
+              title="今日最高价值任务"
+              subtitle="优先回报最高的一项"
+              accent="primary"
+              task={highestValueTask}
+              goalName={highestValueTask.goalId ? goalNameMap.get(highestValueTask.goalId) : undefined}
+              projectName={highestValueTask.projectId ? projectNameMap.get(highestValueTask.projectId) : undefined}
+              onTrack={() => handleSetTracking(highestValueTask.id)}
+              onFocus={() => handleAddAttention(highestValueTask.id)}
+            />
+          )}
+          {biggestGrowthTask && (
+            <RecommendationCard
+              title="今日最大成长任务"
+              subtitle="优先推动能力增长的一项"
+              accent="accent"
+              task={biggestGrowthTask}
+              goalName={biggestGrowthTask.goalId ? goalNameMap.get(biggestGrowthTask.goalId) : undefined}
+              projectName={biggestGrowthTask.projectId ? projectNameMap.get(biggestGrowthTask.projectId) : undefined}
+              onTrack={() => handleSetTracking(biggestGrowthTask.id)}
+              onFocus={() => handleAddAttention(biggestGrowthTask.id)}
+            />
+          )}
+        </section>
+      )}
 
       {/* 追踪任务区 */}
       <section className="w-full">
@@ -542,6 +602,72 @@ export default function TodayPage() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
+  );
+}
+
+function RecommendationCard({
+  title,
+  subtitle,
+  accent,
+  task,
+  goalName,
+  projectName,
+  onTrack,
+  onFocus,
+}: {
+  title: string;
+  subtitle: string;
+  accent: 'primary' | 'accent';
+  task: IQuestTask;
+  goalName?: string;
+  projectName?: string;
+  onTrack: () => void;
+  onFocus: () => void;
+}) {
+  const accentClass =
+    accent === 'primary'
+      ? 'from-primary/12 to-primary/5 border-primary/20'
+      : 'from-accent/12 to-accent/5 border-accent/20';
+
+  return (
+    <Card className={`border bg-gradient-to-br ${accentClass}`}>
+      <CardHeader className="pb-3">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <CardTitle className="text-lg">{title}</CardTitle>
+            <p className="text-sm text-muted-foreground mt-1">{subtitle}</p>
+          </div>
+          <Badge className={`${DIFFICULTY_COLOR[task.difficulty]} border`}>
+            {DIFFICULTY_LABEL[task.difficulty]}
+          </Badge>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div>
+          <div className="font-semibold text-foreground">{task.name}</div>
+          <div className="text-sm text-muted-foreground mt-1">
+            {task.description || '这项任务已经具备开始条件，可以直接推进。'}
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-2 text-xs">
+          <Badge variant="outline">{task.estimatedMinutes} 分钟</Badge>
+          <Badge variant="outline">+{task.rewardReputation} 声望</Badge>
+          {task.rewardSkillPoints > 0 ? <Badge variant="outline">+{task.rewardSkillPoints} 能力点</Badge> : null}
+          {goalName ? <Badge variant="outline">目标：{goalName}</Badge> : null}
+          {projectName ? <Badge variant="outline">项目：{projectName}</Badge> : null}
+        </div>
+        <div className="flex gap-2">
+          <Button size="sm" onClick={onTrack} className="gap-1.5">
+            <Target className="h-3.5 w-3.5" />
+            设为追踪
+          </Button>
+          <Button size="sm" variant="outline" onClick={onFocus} className="gap-1.5">
+            <Zap className="h-3.5 w-3.5" />
+            加入注意力
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 

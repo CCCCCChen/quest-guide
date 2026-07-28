@@ -2,6 +2,9 @@ import { Routes, Route, useSearchParams } from "react-router-dom";
 import { Layout } from "@/components/Layout";
 import NotFoundPage from "@/pages/NotFoundPage/NotFoundPage";
 import TodayPage from "@/pages/Today/TodayPage";
+import GoalsPage from "@/pages/Goals/GoalsPage";
+import ProjectsPage from "@/pages/Projects/ProjectsPage";
+import ReflectionsPage from "@/pages/Reflections/ReflectionsPage";
 import QuestPoolPage from "@/pages/QuestPool/QuestPoolPage";
 import SkillTreePage from "@/pages/SkillTree/SkillTreePage";
 import ShopPage from "@/pages/Shop/ShopPage";
@@ -39,6 +42,9 @@ export default function App() {
     <Routes>
       <Route element={<Layout />}>
         <Route index element={<TodayPage />} />
+        <Route path="goals" element={<GoalsPage />} />
+        <Route path="projects" element={<ProjectsPage />} />
+        <Route path="reflections" element={<ReflectionsPage />} />
         <Route path="quest-pool" element={<QuestPoolPage />} />
         <Route path="skill-tree" element={<SkillTreePage />} />
         <Route path="shop" element={<ShopPage />} />

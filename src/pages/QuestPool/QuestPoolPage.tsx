@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Swords,
@@ -66,6 +66,8 @@ import { z } from 'zod';
 import { useTasks } from '@/hooks/useTasks';
 import { tasksApi } from '@/api/tasks';
 import { useSkills } from '@/hooks/useSkills';
+import { useGoals } from '@/hooks/useGoals';
+import { useProjects } from '@/hooks/useProjects';
 import { useShop } from '@/hooks/useShop';
 import { useSettings } from '@/hooks/useSettings';
 import type { IQuestTask, TaskDifficulty, TaskType } from '@/types/quest';
@@ -92,6 +94,8 @@ const formSchema = z.object({
   difficulty: z.enum(['easy', 'normal', 'hard', 'epic'] as const),
   estimatedMinutes: z.number().int().min(5, '至少 5 分钟').max(9999, '数值过大'),
   relatedSkillId: z.string().optional(),
+  goalId: z.string().optional(),
+  projectId: z.string().optional(),
   bossName: z.string().max(30, 'Boss 名称过长').optional(),
   parentId: z.string().optional(),
 });
@@ -110,6 +114,8 @@ export default function QuestPoolPage() {
     activeAttentionTasks,
   } = useTasks();
   const { skills, addSkillPoints } = useSkills();
+  const { goals } = useGoals();
+  const { projects } = useProjects();
   const { addReputation } = useShop();
   const { settings } = useSettings();
 
@@ -131,12 +137,16 @@ export default function QuestPoolPage() {
       difficulty: 'normal',
       estimatedMinutes: 30,
       relatedSkillId: '',
+      goalId: '',
+      projectId: '',
       bossName: '',
       parentId: '',
     },
   });
 
   const watchType = form.watch('type');
+  const watchGoalId = form.watch('goalId');
+  const watchProjectId = form.watch('projectId');
 
   const epicRootTasks = useMemo(() => {
     return tasks.filter((t) => t.type === 'epic' && !t.parentId);
@@ -185,6 +195,8 @@ export default function QuestPoolPage() {
       difficulty: 'normal',
       estimatedMinutes: 30,
       relatedSkillId: '',
+      goalId: '',
+      projectId: '',
       bossName: '',
       parentId: '',
     });
@@ -200,6 +212,8 @@ export default function QuestPoolPage() {
       difficulty: task.difficulty,
       estimatedMinutes: task.estimatedMinutes,
       relatedSkillId: task.relatedSkillId || '',
+      goalId: task.goalId || '',
+      projectId: task.projectId || '',
       bossName: task.bossName || '',
       parentId: task.parentId || '',
     });
@@ -207,6 +221,7 @@ export default function QuestPoolPage() {
   };
 
   const onSubmit = (values: FormValues) => {
+    const capabilityIds = values.relatedSkillId ? [values.relatedSkillId] : [];
     if (editingTask) {
       updateTask(editingTask.id, {
         name: values.name,
@@ -215,6 +230,9 @@ export default function QuestPoolPage() {
         difficulty: values.difficulty,
         estimatedMinutes: values.estimatedMinutes,
         relatedSkillId: values.relatedSkillId || undefined,
+        goalId: values.goalId || undefined,
+        projectId: values.projectId || undefined,
+        capabilityIds,
         bossName: values.type === 'epic' ? values.bossName || undefined : undefined,
         parentId: values.parentId || undefined,
       });
@@ -227,6 +245,9 @@ export default function QuestPoolPage() {
         difficulty: values.difficulty,
         estimatedMinutes: values.estimatedMinutes,
         relatedSkillId: values.relatedSkillId || undefined,
+        goalId: values.goalId || undefined,
+        projectId: values.projectId || undefined,
+        capabilityIds,
         bossName: values.type === 'epic' ? values.bossName || undefined : undefined,
         parentId: values.parentId || undefined,
       });
@@ -272,6 +293,17 @@ export default function QuestPoolPage() {
   const skillOptions = useMemo(() => {
     return skills.filter((s) => s.level >= 1);
   }, [skills]);
+
+  const projectOptions = useMemo(() => {
+    if (!watchGoalId) return projects;
+    return projects.filter((p) => p.goalId === watchGoalId);
+  }, [projects, watchGoalId]);
+
+  useEffect(() => {
+    if (!watchProjectId) return;
+    const ok = projectOptions.some((p) => p.id === watchProjectId);
+    if (!ok) form.setValue('projectId', '');
+  }, [form, projectOptions, watchProjectId]);
 
   const parentEpicOptions = useMemo(() => {
     return tasks.filter((t) => t.type === 'epic' && !t.parentId);
@@ -568,14 +600,14 @@ export default function QuestPoolPage() {
                   name="relatedSkillId"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>关联技能</FormLabel>
+                      <FormLabel>关联能力</FormLabel>
                       <Select
                         onValueChange={field.onChange}
                         value={field.value || ''}
                       >
                         <FormControl>
                           <SelectTrigger>
-                            <SelectValue placeholder="选择技能" />
+                            <SelectValue placeholder="选择能力节点" />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
@@ -583,6 +615,60 @@ export default function QuestPoolPage() {
                           {skillOptions.map((s) => (
                             <SelectItem key={s.id} value={s.id}>
                               {s.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="goalId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>关联目标</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value || ''}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="可选" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="">无</SelectItem>
+                          {goals.map((g) => (
+                            <SelectItem key={g.id} value={g.id}>
+                              {g.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="projectId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>关联项目</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value || ''}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="可选" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="">无</SelectItem>
+                          {projectOptions.map((p) => (
+                            <SelectItem key={p.id} value={p.id}>
+                              {p.name}
                             </SelectItem>
                           ))}
                         </SelectContent>

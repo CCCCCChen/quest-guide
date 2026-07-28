@@ -6,6 +6,7 @@ import { settingsApi } from '@/api';
 const STORAGE_KEY = '__quest_guild_settings';
 
 const DEFAULT_SETTINGS: IAppSettings = {
+  appName: '悬赏任务公会',
   manaMax: 5,
   resetTime: '06:00',
   soundEnabled: true,

@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
-import { logger } from '@lark-apaas/client-toolkit-lite';
 import type { IQuestTask, IActiveTrack, IFocusLog, TaskType, TaskDifficulty } from '@/types/quest';
 import { PRESET_TASKS, PRESET_FOCUS_LOGS } from '@/data/preset';
 import { playSound } from '@/lib/sound';
 import { store, subscribeStorageChange } from '@/lib/storage';
+import { appLogger } from '@/lib/runtime';
 import { tasksApi } from '@/api';
+import { grantCapabilityExperience } from '@/hooks/useSkills';
 
 const STORAGE_KEY_TASKS = '__quest_guild_tasks';
 const STORAGE_KEY_TRACK = '__quest_guild_active_track';
@@ -110,7 +111,7 @@ async function syncFromServer() {
     saveFocusLogsCache(logs);
     notifyAll();
   } catch (e) {
-    logger.error('同步服务端数据失败，使用本地缓存', String(e));
+    appLogger.error('同步服务端数据失败，使用本地缓存', String(e));
   } finally {
     initialized = true;
   }
@@ -201,6 +202,9 @@ export function useTasks() {
       difficulty: TaskDifficulty;
       estimatedMinutes: number;
       relatedSkillId?: string;
+      goalId?: string;
+      projectId?: string;
+      capabilityIds?: string[];
       bossName?: string;
       parentId?: string;
       stage?: number;
@@ -233,6 +237,9 @@ export function useTasks() {
         estimatedMinutes: data.estimatedMinutes,
         actualMinutes: 0,
         relatedSkillId: data.relatedSkillId,
+        goalId: data.goalId,
+        projectId: data.projectId,
+        capabilityIds: data.capabilityIds || (data.relatedSkillId ? [data.relatedSkillId] : []),
         bossName: data.bossName,
         bossProgress: 0,
         parentId: data.parentId,
@@ -458,7 +465,12 @@ export function useTasks() {
 
       tasksApi.complete(taskId).catch(() => {});
 
-      toast.success(`🎉 任务完成！获得 ${task.rewardReputation} 声望${task.rewardSkillPoints > 0 ? ` + ${task.rewardSkillPoints} 技能点` : ''}`);
+      if (task.relatedSkillId) {
+        const minutes = actualMinutes > 0 ? actualMinutes : task.estimatedMinutes;
+        grantCapabilityExperience(task.relatedSkillId, minutes);
+      }
+
+      toast.success(`🎉 任务完成！获得 ${task.rewardReputation} 声望${task.rewardSkillPoints > 0 ? ` + ${task.rewardSkillPoints} 能力点` : ''}`);
 
       return {
         reputation: task.rewardReputation,
