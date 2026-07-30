@@ -19,6 +19,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     expandFloat: () => ipcRenderer.invoke('window:expandFloat'),
     collapseFloat: () => ipcRenderer.invoke('window:collapseFloat'),
     setHeight: (height) => ipcRenderer.invoke('window:setFloatHeight', height),
+    setFloatPosition: (x, y) => ipcRenderer.invoke('window:setFloatPosition', { x, y }),
+    getFloatPositionSync: () => ipcRenderer.sendSync('window:getFloatPositionSync'),
     quit: () => ipcRenderer.invoke('app:quit')
   },
 

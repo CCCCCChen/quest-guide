@@ -5,6 +5,7 @@ export const tasksApi = {
   getAll: () => api.get<IQuestTask[]>('/tasks'),
 
   create: (data: {
+    id?: string;
     name: string;
     description?: string;
     type: TaskType;
@@ -16,6 +17,7 @@ export const tasksApi = {
     capabilityIds?: string[];
     bossName?: string;
     parentId?: string;
+    stage?: number;
     tags?: string[];
   }) => api.post<IQuestTask>('/tasks', data),
 

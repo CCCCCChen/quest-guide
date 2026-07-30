@@ -96,10 +96,6 @@ db.exec(`
     proficiencyLevel INTEGER DEFAULT 0,
     experience INTEGER DEFAULT 0,
     lastImprovedAt INTEGER
-    unlockedAt INTEGER,
-    proficiencyLevel INTEGER DEFAULT 0,
-    experience INTEGER DEFAULT 0,
-    lastImprovedAt INTEGER
   );
 
   CREATE TABLE IF NOT EXISTS shop_items (
@@ -241,7 +237,7 @@ app.post('/api/tasks', (req, res) => {
   const rewardSkillPoints = ({ easy: 0, normal: 0, hard: 1, epic: 3 })[data.difficulty];
 
   const newTask = {
-    id: genId(data.type === 'epic' ? 'ep' : 'dy'),
+    id: data.id || genId(data.type === 'epic' ? 'ep' : 'dy'),
     name: data.name,
     description: data.description || '',
     type: data.type,

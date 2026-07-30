@@ -259,8 +259,8 @@ export function useTasks() {
       saveTasksCache(tasksState);
       notifyAll();
 
-      // 异步同步到服务端
-      tasksApi.create(data).catch((e) => {
+      // 异步同步到服务端（传前端生成的 id，保持父子关系一致）
+      tasksApi.create({ ...data, id: newTask.id, stage }).catch((e) => {
         toast.error('任务同步失败', { description: String(e) });
       });
 

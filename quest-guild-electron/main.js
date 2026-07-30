@@ -461,19 +461,36 @@ ipcMain.handle('window:collapseFloat', async () => {
   return true;
 });
 
+ipcMain.on('window:getFloatPositionSync', (event) => {
+  if (floatWindow && !floatWindow.isDestroyed()) {
+    const [x, y] = floatWindow.getPosition();
+    event.returnValue = { x, y };
+  } else {
+    event.returnValue = null;
+  }
+});
+
+ipcMain.handle('window:setFloatPosition', (_, { x, y }) => {
+  if (floatWindow && !floatWindow.isDestroyed()) {
+    const { width, height } = floatWindow.getBounds();
+    floatWindow.setPosition(Math.round(x), Math.round(y));
+    store.set('floatWindowPosition', { x: Math.round(x), y: Math.round(y) });
+  }
+  return true;
+});
+
 ipcMain.handle('app:quit', () => {
   isQuitting = true;
   app.quit();
   return true;
 });
-
 // IPC 通信 - API 代理转发到本地后端
-ipcMain.handle('api:proxy', async (_, { method, path: p, body }) => {
+ipcMain.handle('api:proxy', async (_, { method, path, body }) => {
   return new Promise((resolve) => {
     const req = http.request({
       hostname: 'localhost',
       port: serverPort,
-      path: '/api' + p,
+      path: '/api' + path,
       method: method || 'GET',
       headers: { 'Content-Type': 'application/json' },
     }, (res) => {

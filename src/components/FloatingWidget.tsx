@@ -62,25 +62,41 @@ export default function FloatingWidget({ isWindowMode = false }: { isWindowMode?
 
   const [isExpanded, setIsExpanded] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
-  const [isDraggingMode, setIsDraggingMode] = useState(false); // 长按进入拖动模式
   const [quickOpen, setQuickOpen] = useState(false);
   const [quickName, setQuickName] = useState('');
   const [quickMinutes, setQuickMinutes] = useState('25');
   const [quickDifficulty, setQuickDifficulty] = useState<TaskDifficulty>('normal');
   const widgetRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
-  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dragStateRef = useRef({
     startX: 0,
     startY: 0,
     originX: 0,
     originY: 0,
     moved: false,
-    pressedAt: 0,
   });
-  const LONG_PRESS_THRESHOLD = 300; // ms 长按阈值
+  const DRAG_THRESHOLD = 3; // 移动超过此像素视为拖拽
+  const expandedDragRef = useRef({
+    startX: 0, startY: 0, originX: 0, originY: 0, moved: false,
+  });
 
   const isTrackingRunning = activeTrack?.isRunning ?? false;
+
+  const electronApi = typeof window !== 'undefined' ? (window as any).electronAPI : null;
+
+  // Electron 下读取窗口实际位置；浏览器模式使用 settings.floatingPosition
+  const getElectronWindowPos = useCallback(() => {
+    if (!isWindowMode || !electronApi?.window?.getFloatPositionSync) return null;
+    return electronApi.window.getFloatPositionSync() as { x: number; y: number } | null;
+  }, [isWindowMode, electronApi]);
+
+  const moveElectronWindow = useCallback(
+    (x: number, y: number) => {
+      if (!isWindowMode || !electronApi?.window?.setFloatPosition) return;
+      electronApi.window.setFloatPosition(x, y);
+    },
+    [isWindowMode, electronApi],
+  );
 
   const completedToday = useMemo(() => {
     const today = new Date().toDateString();
@@ -137,29 +153,37 @@ export default function FloatingWidget({ isWindowMode = false }: { isWindowMode?
     return () => clearTimeout(timer);
   }, [isExpanded, isWindowMode, trackingTask?.id, activeAttentionTasks.length, quickOpen]);
 
+  // 拖拽：按下立即监听 mousemove，超过阈值进入拖拽
   useEffect(() => {
     if (!isDragging) return;
     const handleMouseMove = (e: MouseEvent) => {
       const dx = e.clientX - dragStateRef.current.startX;
       const dy = e.clientY - dragStateRef.current.startY;
-      if (Math.abs(dx) > 2 || Math.abs(dy) > 2) {
+      if (Math.abs(dx) > DRAG_THRESHOLD || Math.abs(dy) > DRAG_THRESHOLD) {
         dragStateRef.current.moved = true;
       }
-      updateSettings({
-        floatingPosition: {
-          x: dragStateRef.current.originX + dx,
-          y: dragStateRef.current.originY + dy,
-        },
-      });
+      const nextX = dragStateRef.current.originX + dx;
+      const nextY = dragStateRef.current.originY + dy;
+
+      if (isWindowMode) {
+        moveElectronWindow(nextX, nextY);
+        updateSettings({ floatingPosition: { x: nextX, y: nextY } });
+      } else {
+        updateSettings({ floatingPosition: { x: nextX, y: nextY } });
+      }
     };
-    const handleMouseUp = () => setIsDragging(false);
+    const handleMouseUp = () => {
+      setIsDragging(false);
+      // 延迟重置 moved，让 click/dblclick 能读到正确值
+      setTimeout(() => { dragStateRef.current.moved = false; }, 0);
+    };
     window.addEventListener('mousemove', handleMouseMove);
     window.addEventListener('mouseup', handleMouseUp);
     return () => {
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [isDragging, updateSettings]);
+  }, [isDragging, isWindowMode, moveElectronWindow, updateSettings, DRAG_THRESHOLD]);
 
   const handleComplete = useCallback(
     (task: IQuestTask) => {
@@ -214,65 +238,97 @@ export default function FloatingWidget({ isWindowMode = false }: { isWindowMode?
     }
   }, [setFullMode]);
 
-  // 收起态点击：点击非按钮区域展开（长按不算）
-  const handleCollapsedClick = useCallback(
-    (e: React.MouseEvent) => {
-      if (dragStateRef.current.moved || isDraggingMode) return;
-      // 点击按钮区域不处理
-      const target = e.target as HTMLElement;
-      if (target.closest('button')) return;
-      // 按下去少于阈值的是点击
-      const pressDuration = Date.now() - dragStateRef.current.pressedAt;
-      if (pressDuration < LONG_PRESS_THRESHOLD) {
-        handleExpand();
-      }
-    },
-    [handleExpand, isDraggingMode, LONG_PRESS_THRESHOLD],
-  );
-
-  // 收起态鼠标按下：启动长按计时器
+  // ========== 收起态交互：按下即可拖拽，双击展开 ==========
   const handleCollapsedMouseDown = useCallback(
     (e: React.MouseEvent) => {
       if (isExpanded) return;
-      // 点击按钮区域不处理长按
       const target = e.target as HTMLElement;
       if (target.closest('button')) return;
-      
-      dragStateRef.current = {
-        startX: e.clientX,
-        startY: e.clientY,
-        originX: position.x,
-        originY: position.y,
-        moved: false,
-        pressedAt: Date.now(),
-      };
-      
-      // 长按进入拖动模式
-      longPressTimerRef.current = setTimeout(() => {
-        setIsDraggingMode(true);
-        setIsDragging(true);
-        document.body.style.cursor = 'grabbing';
-      }, LONG_PRESS_THRESHOLD);
+
+      let originX = position.x;
+      let originY = position.y;
+      if (isWindowMode) {
+        const winPos = getElectronWindowPos();
+        if (winPos) { originX = winPos.x; originY = winPos.y; }
+      }
+      dragStateRef.current = { startX: e.clientX, startY: e.clientY, originX, originY, moved: false };
+      setIsDragging(true);
     },
-    [isExpanded, position.x, position.y, LONG_PRESS_THRESHOLD],
+    [isExpanded, isWindowMode, position.x, position.y, getElectronWindowPos],
   );
 
-  // 收起态鼠标抬起：结束长按
   const handleCollapsedMouseUp = useCallback(() => {
-    if (longPressTimerRef.current) {
-      clearTimeout(longPressTimerRef.current);
-      longPressTimerRef.current = null;
-    }
-    if (isDraggingMode) {
-      setIsDraggingMode(false);
-      document.body.style.cursor = '';
-    }
     setIsDragging(false);
-    // 重置状态
-    setTimeout(() => {
-      dragStateRef.current.moved = false;
-    }, 0);
-  }, [isDraggingMode]);
+    setTimeout(() => { dragStateRef.current.moved = false; }, 0);
+  }, []);
+
+  const handleCollapsedDoubleClick = useCallback(
+    (e: React.MouseEvent) => {
+      if (dragStateRef.current.moved) return;
+      const target = e.target as HTMLElement;
+      if (target.closest('button')) return;
+      handleExpand();
+    },
+    [handleExpand],
+  );
+
+  // 单击不做操作（双击才展开）
+  const handleCollapsedClick = useCallback((_e: React.MouseEvent) => {}, []);
+
+  // ========== 展开态标题栏交互：按下即可拖拽，双击缩小 ==========
+  const handleHeaderMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (target.closest('button')) return;
+      let originX = position.x;
+      let originY = position.y;
+      if (isWindowMode) {
+        const winPos = getElectronWindowPos();
+        if (winPos) { originX = winPos.x; originY = winPos.y; }
+      }
+      expandedDragRef.current = { startX: e.clientX, startY: e.clientY, originX, originY, moved: false };
+
+      const moveHandler = (ev: MouseEvent) => {
+        const dx = ev.clientX - expandedDragRef.current.startX;
+        const dy = ev.clientY - expandedDragRef.current.startY;
+        if (Math.abs(dx) > DRAG_THRESHOLD || Math.abs(dy) > DRAG_THRESHOLD) {
+          expandedDragRef.current.moved = true;
+        }
+        const nx = expandedDragRef.current.originX + dx;
+        const ny = expandedDragRef.current.originY + dy;
+        if (isWindowMode) {
+          moveElectronWindow(nx, ny);
+          updateSettings({ floatingPosition: { x: nx, y: ny } });
+        } else {
+          updateSettings({ floatingPosition: { x: nx, y: ny } });
+        }
+      };
+      const upHandler = () => {
+        window.removeEventListener('mousemove', moveHandler);
+        window.removeEventListener('mouseup', upHandler);
+        document.body.style.cursor = '';
+        setTimeout(() => { expandedDragRef.current.moved = false; }, 0);
+      };
+      document.body.style.cursor = 'grabbing';
+      window.addEventListener('mousemove', moveHandler);
+      window.addEventListener('mouseup', upHandler);
+    },
+    [isWindowMode, position.x, position.y, getElectronWindowPos, moveElectronWindow, updateSettings, DRAG_THRESHOLD],
+  );
+
+  const handleHeaderMouseUp = useCallback(() => {
+    document.body.style.cursor = '';
+  }, []);
+
+  const handleHeaderDoubleClick = useCallback(
+    (e: React.MouseEvent) => {
+      if (expandedDragRef.current.moved) return;
+      const target = e.target as HTMLElement;
+      if (target.closest('button')) return;
+      handleCollapse();
+    },
+    [handleCollapse],
+  );
 
   return (
     <div
@@ -282,12 +338,10 @@ export default function FloatingWidget({ isWindowMode = false }: { isWindowMode?
           ? { width: '100%', height: '100%' }
           : {
               position: 'fixed',
-              right: position.x < 0 ? `${Math.abs(position.x)}px` : 'auto',
-              left: position.x >= 0 ? `${position.x}px` : 'auto',
-              bottom: position.y < 0 ? `${Math.abs(position.y)}px` : 'auto',
-              top: position.y >= 0 ? `${position.y}px` : 'auto',
+              right: '24px',
+              bottom: '24px',
               zIndex: 9999,
-              width: FLOAT_WIDTH,
+              width: isExpanded ? FLOAT_WIDTH : undefined,
             }
       }
       className="select-none"
@@ -296,38 +350,41 @@ export default function FloatingWidget({ isWindowMode = false }: { isWindowMode?
         {!isExpanded ? (
           <motion.div
             key="collapsed"
-            initial={{ opacity: 0, scale: 0.92, y: 12 }}
-            animate={{
-              opacity: isDragging ? opacity * 0.5 : opacity,
-              scale: isDragging ? 0.96 : 1,
-              y: 0,
-            }}
-            exit={{ opacity: 0, scale: 0.92, y: 12 }}
+            initial={isWindowMode ? { opacity: 0 } : { opacity: 0, scale: 0.92, y: 12 }}
+            animate={
+              isWindowMode
+                ? { opacity: 1 }
+                : { opacity: isDragging ? opacity * 0.5 : opacity, scale: isDragging ? 0.96 : 1, y: 0 }
+            }
+            exit={isWindowMode ? { opacity: 0 } : { opacity: 0, scale: 0.92, y: 12 }}
             transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
             style={isWindowMode ? { width: '100%', height: '100%' } : undefined}
             className={cn(
               isWindowMode
                 ? 'w-full h-full rounded-2xl overflow-hidden'
                 : 'rounded-2xl cursor-pointer overflow-hidden',
-              'bg-card/92 backdrop-blur-2xl border border-primary/30',
-              'shadow-[0_4px_24px_rgba(0,0,0,0.5),0_0_40px_rgba(202,166,54,0.12)]',
+              'bg-card backdrop-blur border border-primary/40',
               'relative',
-              'transition-shadow duration-300',
-              'hover:border-primary/50 hover:shadow-[0_4px_28px_rgba(0,0,0,0.55),0_0_50px_rgba(202,166,54,0.2)]',
+              'hover:border-primary/50',
             )}
           >
-            {/* 点击+长按区域（包含所有内容，支持任意位置点击/长按） */}
-            <div
-              onMouseDown={handleCollapsedMouseDown}
-              onMouseUp={handleCollapsedMouseUp}
-              onMouseLeave={handleCollapsedMouseUp} // 离开时取消长按
-              onClick={handleCollapsedClick}
-              style={isWindowMode ? ({ WebkitAppRegion: 'no-drag', width: '100%', height: '100%' } as CSSProperties) : undefined}
-              className="flex items-center gap-0 px-1 pt-1 relative">
-              {/* 拖动握柄（仅浏览器模式可见，Electron下支持任意位置长按拖动） */}
-              {!isWindowMode && (
-                <div className="absolute top-0 left-0 right-0 h-3 cursor-grab active:cursor-grabbing" />
+            {/* 收起态交互区 */}
+            <div className="flex flex-col w-full h-full select-none relative">
+              {/* 拖拽手柄（仅 Electron，6px 窄条负责原生拖拽） */}
+              {isWindowMode && (
+                <div style={{
+                  WebkitAppRegion: 'drag',
+                  height: 12,
+                  width: '100%',
+                  flexShrink: 0,
+                  cursor: 'grab',
+                  background: 'linear-gradient(rgba(202,166,54,0.35) 1px, transparent 1px) 50% 3px / 18px 1px no-repeat, linear-gradient(rgba(202,166,54,0.35) 1px, transparent 1px) 50% 5px / 18px 1px no-repeat, linear-gradient(rgba(202,166,54,0.35) 1px, transparent 1px) 50% 7px / 18px 1px no-repeat, rgba(202,166,54,0.05)',
+                } as CSSProperties} />
               )}
+              <div
+                onDoubleClick={handleCollapsedDoubleClick}
+                style={isWindowMode ? ({ WebkitAppRegion: 'no-drag', flex: 1, cursor: 'pointer' } as CSSProperties) : undefined}
+                className="flex items-center gap-0 px-1 pt-1 relative cursor-pointer">
               {/* 左侧：任务/播放控制 */}
               <div className="flex-1 min-w-0 flex items-center gap-2 px-3 py-2">
                 {trackingTask ? (
@@ -336,10 +393,13 @@ export default function FloatingWidget({ isWindowMode = false }: { isWindowMode?
                       variant="ghost"
                       size="icon"
                       className="h-9 w-9 shrink-0 rounded-full bg-primary/10 hover:bg-primary/20 text-primary"
-                      style={isWindowMode ? ({ WebkitAppRegion: 'no-drag' } as CSSProperties) : undefined}
                       onClick={(e) => {
                         e.stopPropagation();
                         if (isTrackingRunning) { pauseTracking(); } else { startTracking(); }
+                      }}
+                      onDoubleClick={(e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
                       }}
                     >
                       {isTrackingRunning ? (
@@ -378,7 +438,7 @@ export default function FloatingWidget({ isWindowMode = false }: { isWindowMode?
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="text-[13px] text-muted-foreground leading-tight">
-                        点击展开控制台
+                        双击展开控制台
                       </div>
                       <div className="text-[10px] text-muted-foreground/60 mt-0.5">
                         {completedToday} 个任务已完成
@@ -404,6 +464,7 @@ export default function FloatingWidget({ isWindowMode = false }: { isWindowMode?
                 </div>
               </div>
             </div>
+          </div>
           </motion.div>
         ) : (
           <motion.div
@@ -414,24 +475,31 @@ export default function FloatingWidget({ isWindowMode = false }: { isWindowMode?
             transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
             className={cn(
               'rounded-2xl overflow-hidden',
-              'bg-card/95 backdrop-blur-2xl border border-primary/30',
-              'shadow-[0_8px_40px_rgba(0,0,0,0.6),0_0_60px_rgba(202,166,54,0.15)]',
+              'bg-card backdrop-blur border border-primary/40',
             )}
             style={isWindowMode ? { width: '100%' } : { width: FLOAT_WIDTH }}
           >
             {/* 头部 */}
             <div
-              className="flex items-center justify-between px-4 py-2.5 border-b border-border/40 bg-gradient-to-r from-primary/8 via-transparent to-accent/8"
+              className="flex items-center justify-between px-4 py-2.5 border-b border-border/40 bg-gradient-to-r from-primary/8 via-transparent to-accent/8 relative"
             >
-              {/* 拖拽区域 + 点击缩小 */}
+              {/* 拖拽手柄（仅 Electron，渐变窄条指示可拖拽区域） */}
+              {isWindowMode && (
+                <div
+                  className="absolute top-0 left-0 right-0"
+                  style={{
+                    WebkitAppRegion: 'drag',
+                    height: 6,
+                    cursor: 'grab',
+                    background: 'linear-gradient(rgba(202,166,54,0.3) 1px, transparent 1px) 50% 2px / 14px 1px no-repeat, linear-gradient(rgba(202,166,54,0.3) 1px, transparent 1px) 50% 4px / 14px 1px no-repeat, rgba(202,166,54,0.05)',
+                  } as CSSProperties}
+                />
+              )}
+              {/* 标题栏：双击缩小 */}
               <div
-                style={isWindowMode ? ({ WebkitAppRegion: 'drag' } as CSSProperties) : undefined}
-                className="flex-1 flex items-center gap-2 cursor-pointer"
-                onClick={(e) => {
-                  // 点击按钮区域不触发
-                  if ((e.target as HTMLElement).closest('button')) return;
-                  handleCollapse();
-                }}
+                onDoubleClick={handleHeaderDoubleClick}
+                style={isWindowMode ? ({ WebkitAppRegion: 'no-drag' } as CSSProperties) : undefined}
+                className="flex-1 flex items-center gap-2 cursor-pointer select-none"
               >
                 <div className="size-7 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-md shadow-primary/20 pointer-events-none">
                   <Sparkles className="h-3.5 w-3.5 text-primary-foreground" />
@@ -448,7 +516,6 @@ export default function FloatingWidget({ isWindowMode = false }: { isWindowMode?
                   variant="ghost"
                   size="icon"
                   className="h-7 w-7 rounded-lg"
-                  style={isWindowMode ? ({ WebkitAppRegion: 'no-drag' } as CSSProperties) : undefined}
                   onClick={handleCollapse}
                   title="收起"
                 >
@@ -458,7 +525,6 @@ export default function FloatingWidget({ isWindowMode = false }: { isWindowMode?
                   variant="ghost"
                   size="icon"
                   className="h-7 w-7 rounded-lg"
-                  style={isWindowMode ? ({ WebkitAppRegion: 'no-drag' } as CSSProperties) : undefined}
                   onClick={handleExpandMain}
                   title="展开主界面"
                 >
@@ -468,7 +534,7 @@ export default function FloatingWidget({ isWindowMode = false }: { isWindowMode?
             </div>
 
             {/* 内容区 */}
-            <div ref={contentRef} className="max-h-[440px] overflow-y-auto">
+            <div ref={contentRef} className={isWindowMode ? 'max-h-[440px] overflow-y-auto' : 'overflow-y-auto'} style={isWindowMode ? undefined : { maxHeight: 'calc(100vh - 160px)' }}>
               <div className="p-3 space-y-3">
                 {/* 追踪任务卡 */}
                 {trackingTask ? (
