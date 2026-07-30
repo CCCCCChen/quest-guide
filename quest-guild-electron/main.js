@@ -5,6 +5,15 @@ const net = require('net');
 const { spawn } = require('child_process');
 const fs = require('fs');
 const Store = require('electron-store');
+const log = require('electron-log');
+
+// 日志配置
+log.transports.file.level = 'info';
+log.transports.file.maxSize = 5 * 1024 * 1024; // 5MB
+log.transports.file.fileName = 'main.log';
+
+// 重写 console 方法，使 console.log/error 也写入日志文件
+Object.assign(console, log.functions);
 
 // 初始化本地存储
 const store = new Store({
@@ -22,15 +31,17 @@ let floatResizeAnimation = null;
 const APP_CONFIG = {
   mainWidth: 1280,
   mainHeight: 800,
-  floatWidth: 360,
-  floatHeight: 72,
+  floatWidth: 380,
+  floatHeight: 64,
   floatExpandedHeight: 500,
+  floatMaxExpandedHeight: 620,
   // 开发模式加载 Vite 地址，生产模式加载打包后的文件
   devUrl: 'http://localhost:5173',
   mainHtmlPath: path.join(__dirname, 'renderer/app/index.html'),
 };
 
 const isDev = !app.isPackaged;
+log.transports.console.level = isDev ? 'debug' : false;
 let serverPort = Number(process.env.PORT || 3001);
 let serverProcess = null;
 
@@ -65,6 +76,7 @@ async function ensureLocalServer() {
   const preferred = Number(process.env.QUEST_GUILD_SERVER_PORT || 3001);
   const freePort = await findAvailablePort(preferred);
   serverPort = freePort;
+  log.info(`[Server] 使用端口 ${freePort}`);
 
   if (serverProcess && !serverProcess.killed) {
     return;
@@ -97,7 +109,7 @@ function stopLocalServer() {
 // 创建主窗口
 function createMainWindow() {
   const { width, height } = screen.getPrimaryDisplay().workAreaSize;
-  
+
   mainWindow = new BrowserWindow({
     width: APP_CONFIG.mainWidth,
     height: APP_CONFIG.mainHeight,
@@ -132,9 +144,9 @@ function createMainWindow() {
 
   mainWindow.on('closed', () => {
     mainWindow = null;
+    log.info('[Window] 主窗口关闭');
   });
 
-  // 页面加载完成后注入存储桥接
   mainWindow.webContents.on('did-finish-load', () => {
     syncDataToRenderer();
   });
@@ -144,9 +156,12 @@ function createMainWindow() {
 function createFloatWindow() {
   const savedPosition = store.get('floatWindowPosition');
   const { width, height } = screen.getPrimaryDisplay().workAreaSize;
-  
-  const x = savedPosition ? savedPosition.x : width - APP_CONFIG.floatWidth - 20;
-  const y = savedPosition ? savedPosition.y : height - APP_CONFIG.floatHeight - 80;
+
+  // 默认位置：右下角，底部距任务栏 24px，右侧距边 24px
+  const defaultX = width - APP_CONFIG.floatWidth - 24;
+  const defaultY = height - APP_CONFIG.floatHeight - 24;
+  const x = savedPosition ? savedPosition.x : defaultX;
+  const y = savedPosition ? savedPosition.y : defaultY;
 
   floatWindow = new BrowserWindow({
     width: APP_CONFIG.floatWidth,
@@ -154,15 +169,12 @@ function createFloatWindow() {
     x,
     y,
     frame: false,
-    transparent: false,
-    backgroundColor: '#1a1a2e',
+    transparent: true,
+    backgroundColor: '#00000000',
     resizable: false,
-    minWidth: APP_CONFIG.floatWidth,
-    maxWidth: APP_CONFIG.floatWidth,
-    minHeight: APP_CONFIG.floatHeight,
-    maxHeight: APP_CONFIG.floatExpandedHeight,
     alwaysOnTop: true,
     skipTaskbar: true,
+    hasShadow: false,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -171,29 +183,14 @@ function createFloatWindow() {
     }
   });
 
-  // 加载悬浮窗页面（同一前端地址，通过 mode 参数区分）
+  // 加载悬浮窗页面
   if (isDev) {
     floatWindow.loadURL(`${APP_CONFIG.devUrl}?mode=floating`);
   } else {
     floatWindow.loadFile(APP_CONFIG.mainHtmlPath, { query: { mode: 'floating' } });
   }
 
-  // 初始收起状态，限制点击区域为顶部条
-  floatWindow.setShape([{
-    x: 0,
-    y: 0,
-    width: APP_CONFIG.floatWidth,
-    height: APP_CONFIG.floatHeight,
-  }]);
-
-  // 悬浮窗拖动
-  let isDragging = false;
-  let dragOffset = { x: 0, y: 0 };
-
-  floatWindow.on('will-move', (e) => {
-    // 允许拖动
-  });
-
+  // 保存位置
   floatWindow.on('moved', () => {
     const [x, y] = floatWindow.getPosition();
     store.set('floatWindowPosition', { x, y });
@@ -201,6 +198,7 @@ function createFloatWindow() {
 
   floatWindow.on('closed', () => {
     floatWindow = null;
+    log.info('[Float] 悬浮窗关闭');
   });
 }
 
@@ -209,7 +207,8 @@ function showFloatWindow() {
   if (!floatWindow) {
     createFloatWindow();
   }
-  floatWindow.show();
+  floatWindow.showInactive(); // showInactive 不抢焦点
+  floatWindow.setAlwaysOnTop(true, 'screen-saver');
 }
 
 // 构建托盘菜单
@@ -243,11 +242,6 @@ function buildTrayMenu() {
     },
     { type: 'separator' },
     {
-      label: '今日任务概览',
-      enabled: false
-    },
-    { type: 'separator' },
-    {
       label: '退出',
       click: () => {
         isQuitting = true;
@@ -257,14 +251,12 @@ function buildTrayMenu() {
   ]);
 }
 
-// 隐藏悬浮窗
 function hideFloatWindow() {
   if (floatWindow) {
     floatWindow.hide();
   }
 }
 
-// 按设置决定是否显示悬浮窗
 function showFloatWindowIfEnabled() {
   const floatVisible = store.get('floatWindowVisible', true);
   if (floatVisible) {
@@ -276,7 +268,7 @@ function showFloatWindowIfEnabled() {
 function createTray() {
   const iconPath16 = path.join(__dirname, 'assets', 'icon_16.png');
   const iconPath32 = path.join(__dirname, 'assets', 'icon.png');
-  
+
   let trayIcon;
   if (fs.existsSync(iconPath16)) {
     trayIcon = nativeImage.createFromPath(iconPath16);
@@ -285,10 +277,9 @@ function createTray() {
   } else {
     trayIcon = nativeImage.createEmpty();
   }
-  
+
   tray = new Tray(trayIcon);
   tray.setToolTip('悬赏任务公会');
-
   tray.setContextMenu(buildTrayMenu());
 
   tray.on('click', () => {
@@ -306,7 +297,6 @@ function createTray() {
   });
 }
 
-// 同步数据到渲染进程
 function syncDataToRenderer() {
   if (mainWindow) {
     const allData = store.store;
@@ -314,7 +304,6 @@ function syncDataToRenderer() {
   }
 }
 
-// 广播数据变更到所有渲染进程窗口
 function broadcastStorageChange(key, value) {
   const payload = { key, value, timestamp: Date.now() };
   const windows = BrowserWindow.getAllWindows();
@@ -330,7 +319,6 @@ ipcMain.handle('store:get', (_, key) => {
   return store.get(key);
 });
 
-// 同步版 get（preload 使用 sendSync）
 ipcMain.on('store:get-sync', (event, key) => {
   event.returnValue = store.get(key);
 });
@@ -351,7 +339,6 @@ ipcMain.handle('store:getAll', () => {
   return store.store;
 });
 
-// 同步版 getAll
 ipcMain.on('store:getAll-sync', (event) => {
   event.returnValue = store.store;
 });
@@ -380,70 +367,37 @@ ipcMain.handle('window:hideMain', () => {
   return true;
 });
 
-ipcMain.handle('window:minimizeToFloat', () => {
-  if (mainWindow) {
-    mainWindow.hide();
-    showFloatWindowIfEnabled();
-  }
-  return true;
-});
-
-function resizeFloatWindowAnchored(nextHeight) {
-  if (!floatWindow) {
-    return;
-  }
-
-  const [x, y] = floatWindow.getPosition();
-  const [, currentHeight] = floatWindow.getSize();
-  const bottom = y + currentHeight;
-  const display = screen.getDisplayMatching(floatWindow.getBounds());
-  const { x: workX, y: workY, width: workWidth } = display.workArea;
-  const nextY = Math.max(workY, bottom - nextHeight);
-  const nextX = Math.min(
-    Math.max(x, workX),
-    workX + workWidth - APP_CONFIG.floatWidth
-  );
-
-  floatWindow.setBounds({
-    x: nextX,
-    y: nextY,
-    width: APP_CONFIG.floatWidth,
-    height: nextHeight
-  });
-}
-
-function stopFloatResizeAnimation() {
-  if (floatResizeAnimation) {
-    clearInterval(floatResizeAnimation.timer);
-    floatResizeAnimation.resolve();
-    floatResizeAnimation = null;
-  }
-}
-
-function animateFloatWindowHeight(nextHeight) {
-  if (!floatWindow) {
+// ========== 悬浮窗高度动画：底边锚定 ==========
+// 核心逻辑：展开时 y 往上移（减小），保持底边不动；收起时 y 回到原位
+function animateFloatWindowHeight(nextHeight, keepBottom = true) {
+  if (!floatWindow || floatWindow.isDestroyed()) {
     return Promise.resolve();
   }
 
   stopFloatResizeAnimation();
 
-  const startBounds = floatWindow.getBounds();
-  const startHeight = startBounds.height;
+  const bounds = floatWindow.getBounds();
+  const startHeight = bounds.height;
+  const startY = bounds.y;
 
   if (startHeight === nextHeight) {
-    resizeFloatWindowAnchored(nextHeight);
     return Promise.resolve();
   }
 
-  const bottom = startBounds.y + startBounds.height;
-  const display = screen.getDisplayMatching(startBounds);
-  const { x: workX, y: workY, width: workWidth } = display.workArea;
-  const targetY = Math.max(workY, bottom - nextHeight);
-  const targetX = Math.min(
-    Math.max(startBounds.x, workX),
-    workX + workWidth - APP_CONFIG.floatWidth
-  );
-  const duration = 180;
+  // 底边锚定：底边 y = startY + startHeight 固定
+  // 新 y = bottom - nextHeight
+  const bottom = startY + startHeight;
+  const targetY = keepBottom ? bottom - nextHeight : startY;
+
+  // 限制不超出屏幕
+  const display = screen.getDisplayMatching(bounds);
+  const { x: workX, y: workY, height: workHeight, width: workWidth } = display.workArea;
+  const clampedY = Math.max(workY, targetY);
+  const clampedX = Math.max(workX, Math.min(bounds.x, workX + workWidth - APP_CONFIG.floatWidth));
+  const maxHeight = workY + workHeight - clampedY;
+  const clampedHeight = Math.min(nextHeight, maxHeight);
+
+  const duration = 220;
   const startedAt = Date.now();
 
   return new Promise((resolve) => {
@@ -457,12 +411,14 @@ function animateFloatWindowHeight(nextHeight) {
 
       const progress = Math.min(1, (Date.now() - startedAt) / duration);
       const eased = 1 - Math.pow(1 - progress, 3);
+      const currentHeight = Math.round(startHeight + (clampedHeight - startHeight) * eased);
+      const currentY = Math.round(startY + (clampedY - startY) * eased);
 
       floatWindow.setBounds({
-        x: Math.round(startBounds.x + (targetX - startBounds.x) * eased),
-        y: Math.round(startBounds.y + (targetY - startBounds.y) * eased),
+        x: clampedX,
+        y: currentY,
         width: APP_CONFIG.floatWidth,
-        height: Math.round(startHeight + (nextHeight - startHeight) * eased)
+        height: currentHeight,
       });
 
       if (progress >= 1) {
@@ -476,30 +432,31 @@ function animateFloatWindowHeight(nextHeight) {
   });
 }
 
+function stopFloatResizeAnimation() {
+  if (floatResizeAnimation) {
+    clearInterval(floatResizeAnimation.timer);
+    floatResizeAnimation.resolve();
+    floatResizeAnimation = null;
+  }
+}
+
 ipcMain.handle('window:expandFloat', async () => {
-  if (floatWindow) {
-    await animateFloatWindowHeight(APP_CONFIG.floatExpandedHeight);
-    // 动画完成后再扩形状，避免动画期间空白区域可点击
-    floatWindow.setShape([{
-      x: 0,
-      y: 0,
-      width: APP_CONFIG.floatWidth,
-      height: APP_CONFIG.floatExpandedHeight,
-    }]);
+  if (floatWindow && !floatWindow.isDestroyed()) {
+    await animateFloatWindowHeight(APP_CONFIG.floatExpandedHeight, true);
   }
   return true;
 });
 
+ipcMain.handle('window:setFloatHeight', async (_, height) => {
+  if (!floatWindow || floatWindow.isDestroyed()) return false;
+  const clamped = Math.min(height, APP_CONFIG.floatMaxExpandedHeight);
+  await animateFloatWindowHeight(clamped, true);
+  return true;
+});
+
 ipcMain.handle('window:collapseFloat', async () => {
-  if (floatWindow) {
-    // 先限制形状再收窗口，避免窗口缩小后形状未更新
-    floatWindow.setShape([{
-      x: 0,
-      y: 0,
-      width: APP_CONFIG.floatWidth,
-      height: APP_CONFIG.floatHeight,
-    }]);
-    await animateFloatWindowHeight(APP_CONFIG.floatHeight);
+  if (floatWindow && !floatWindow.isDestroyed()) {
+    await animateFloatWindowHeight(APP_CONFIG.floatHeight, true);
   }
   return true;
 });
@@ -511,12 +468,12 @@ ipcMain.handle('app:quit', () => {
 });
 
 // IPC 通信 - API 代理转发到本地后端
-ipcMain.handle('api:proxy', async (_, { method, path, body }) => {
+ipcMain.handle('api:proxy', async (_, { method, path: p, body }) => {
   return new Promise((resolve) => {
     const req = http.request({
       hostname: 'localhost',
       port: serverPort,
-      path: '/api' + path,
+      path: '/api' + p,
       method: method || 'GET',
       headers: { 'Content-Type': 'application/json' },
     }, (res) => {
@@ -535,11 +492,11 @@ ipcMain.handle('api:proxy', async (_, { method, path, body }) => {
 
 // 应用就绪
 app.whenReady().then(() => {
+  log.info(`[App] 启动 (isDev=${isDev}, electron=${process.versions.electron}, node=${process.versions.node})`);
   ensureLocalServer().catch(() => {});
   createMainWindow();
   createTray();
-  
-  // 根据用户设置决定是否显示悬浮窗
+
   setTimeout(() => {
     showFloatWindowIfEnabled();
   }, 1000);
@@ -551,21 +508,22 @@ app.whenReady().then(() => {
   });
 });
 
-// 所有窗口关闭时
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     // 不退出，保持托盘运行
   }
 });
 
-// 应用退出前
 app.on('before-quit', () => {
+  log.info('[App] 退出中...');
   isQuitting = true;
   stopLocalServer();
 });
 
-// 开机自启（可选）
-// app.setLoginItemSettings({
-//   openAtLogin: true,
-//   path: process.execPath
-// });
+process.on('uncaughtException', (err) => {
+  log.error(`[Process] uncaughtException: ${err.message}`, err.stack);
+});
+
+process.on('unhandledRejection', (reason) => {
+  log.error(`[Process] unhandledRejection: ${reason}`);
+});

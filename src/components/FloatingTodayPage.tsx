@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Maximize2, Minimize2, Target, Sparkles, Gem, ListChecks } from 'lucide-react';
+import { Minimize2, Target, Sparkles, Gem, ListChecks } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useTasks } from '@/hooks/useTasks';
 import { useSettings } from '@/hooks/useSettings';
@@ -8,7 +8,7 @@ import { formatDuration, cn } from '@/lib/utils';
 import TodayPage from '@/pages/Today/TodayPage';
 import type { CSSProperties } from 'react';
 
-export default function FloatingTodayPage({ isWindowMode = false }: { isWindowMode?: boolean }) {
+export default function FloatingTodayPage({ isWindowMode: _isWindowMode = false }: { isWindowMode?: boolean }) {
   const { trackingTask, currentTrackSeconds, activeTrack, activeAttentionTasks, tasks } =
     useTasks();
   const { settings } = useSettings();

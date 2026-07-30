@@ -1,4 +1,4 @@
-import { Routes, Route, useSearchParams } from "react-router-dom";
+import { Routes, Route } from "react-router-dom";
 import { Layout } from "@/components/Layout";
 import NotFoundPage from "@/pages/NotFoundPage/NotFoundPage";
 import TodayPage from "@/pages/Today/TodayPage";
@@ -11,12 +11,11 @@ import SkillTreePage from "@/pages/SkillTree/SkillTreePage";
 import ShopPage from "@/pages/Shop/ShopPage";
 import StatsPage from "@/pages/Stats/StatsPage";
 import SettingsPage from "@/pages/Settings/SettingsPage";
-import FloatingTodayPage from "@/components/FloatingTodayPage";
+import FloatingWidget from "@/components/FloatingWidget";
 import { useEffect } from "react";
 
 export default function App() {
-  const [searchParams] = useSearchParams();
-  const isFloatingMode = searchParams.get('mode') === 'floating';
+  const isFloatingMode = new URLSearchParams(window.location.search).get('mode') === 'floating';
 
   useEffect(() => {
     if (isFloatingMode) {
@@ -34,7 +33,7 @@ export default function App() {
   if (isFloatingMode) {
     return (
       <div className="w-full h-screen overflow-hidden bg-transparent">
-        <FloatingTodayPage isWindowMode />
+        <FloatingWidget isWindowMode />
       </div>
     );
   }

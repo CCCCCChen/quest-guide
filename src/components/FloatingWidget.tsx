@@ -7,8 +7,6 @@ import {
   Plus,
   Maximize2,
   Minimize2,
-  Pin,
-  PinOff,
   Gem,
   Target,
   ListChecks,
@@ -42,6 +40,8 @@ const DIFFICULTY_LABELS: Record<TaskDifficulty, string> = {
   epic: '史诗',
 };
 
+const FLOAT_WIDTH = 380;
+
 export default function FloatingWidget({ isWindowMode = false }: { isWindowMode?: boolean }) {
   const {
     tasks,
@@ -60,23 +60,25 @@ export default function FloatingWidget({ isWindowMode = false }: { isWindowMode?
   const { settings, updateSettings } = useSettings();
   const { setFullMode } = useFloatingMode();
 
-  const [isPinned, setIsPinned] = useState(false);
-
   const [isExpanded, setIsExpanded] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [isDraggingMode, setIsDraggingMode] = useState(false); // 长按进入拖动模式
   const [quickOpen, setQuickOpen] = useState(false);
   const [quickName, setQuickName] = useState('');
   const [quickMinutes, setQuickMinutes] = useState('25');
   const [quickDifficulty, setQuickDifficulty] = useState<TaskDifficulty>('normal');
-  const collapseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const widgetRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dragStateRef = useRef({
     startX: 0,
     startY: 0,
     originX: 0,
     originY: 0,
     moved: false,
+    pressedAt: 0,
   });
+  const LONG_PRESS_THRESHOLD = 300; // ms 长按阈值
 
   const isTrackingRunning = activeTrack?.isRunning ?? false;
 
@@ -100,73 +102,59 @@ export default function FloatingWidget({ isWindowMode = false }: { isWindowMode?
 
   const position = settings.floatingPosition;
   const opacity = settings.floatingOpacity;
-  const collapseDelay = settings.floatingCollapseDelay;
 
   const handleExpand = useCallback(() => {
-    if (collapseTimerRef.current) {
-      clearTimeout(collapseTimerRef.current);
-      collapseTimerRef.current = null;
-    }
     setIsExpanded(true);
-    // Electron 环境下通知主进程展开窗口（取消鼠标穿透）
-    if (typeof window !== 'undefined' && (window as any).electronAPI?.window?.expandFloat) {
-      (window as any).electronAPI.window.expandFloat();
+    if (isWindowMode) {
+      const api = (window as any).electronAPI?.window;
+      api?.expandFloat?.();
     }
-  }, []);
+  }, [isWindowMode]);
 
   const handleCollapse = useCallback(() => {
-    if (isPinned) return;
-    if (collapseTimerRef.current) {
-      clearTimeout(collapseTimerRef.current);
+    setIsExpanded(false);
+    if (isWindowMode) {
+      const api = (window as any).electronAPI?.window;
+      api?.collapseFloat?.();
     }
-    collapseTimerRef.current = setTimeout(() => {
-      setIsExpanded(false);
-      // Electron 环境下通知主进程收起窗口（开启鼠标穿透）
-      if (typeof window !== 'undefined' && (window as any).electronAPI?.window?.collapseFloat) {
-        (window as any).electronAPI.window.collapseFloat();
-      }
-    }, collapseDelay);
-  }, [collapseDelay, isPinned]);
+  }, [isWindowMode]);
 
-  const handleDragStart = useCallback(
-    (e: React.MouseEvent) => {
-      if (isExpanded) return;
-      e.preventDefault();
-      setIsDragging(true);
-      dragStateRef.current = {
-        startX: e.clientX,
-        startY: e.clientY,
-        originX: position.x,
-        originY: position.y,
-        moved: false,
-      };
-    },
-    [isExpanded, position.x, position.y],
-  );
+  // 展开后测量内容实际高度调整 Electron 窗口
+  useEffect(() => {
+    if (!isExpanded || !isWindowMode) return;
+    const api = (window as any).electronAPI?.window;
+    if (!api?.setHeight) return;
+
+    const timer = setTimeout(() => {
+      if (!contentRef.current) return;
+      const contentH = contentRef.current.scrollHeight;
+      if (contentH < 50) return;
+      const headerH = 52;
+      const footerH = 36;
+      const padding = 8;
+      api.setHeight(headerH + contentH + footerH + padding);
+    }, 280);
+    return () => clearTimeout(timer);
+  }, [isExpanded, isWindowMode, trackingTask?.id, activeAttentionTasks.length, quickOpen]);
 
   useEffect(() => {
     if (!isDragging) return;
-
     const handleMouseMove = (e: MouseEvent) => {
       const dx = e.clientX - dragStateRef.current.startX;
       const dy = e.clientY - dragStateRef.current.startY;
       if (Math.abs(dx) > 2 || Math.abs(dy) > 2) {
         dragStateRef.current.moved = true;
       }
-      const newX = dragStateRef.current.originX + dx;
-      const newY = dragStateRef.current.originY + dy;
       updateSettings({
-        floatingPosition: { x: newX, y: newY },
+        floatingPosition: {
+          x: dragStateRef.current.originX + dx,
+          y: dragStateRef.current.originY + dy,
+        },
       });
     };
-
-    const handleMouseUp = () => {
-      setIsDragging(false);
-    };
-
+    const handleMouseUp = () => setIsDragging(false);
     window.addEventListener('mousemove', handleMouseMove);
     window.addEventListener('mouseup', handleMouseUp);
-
     return () => {
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
@@ -204,13 +192,8 @@ export default function FloatingWidget({ isWindowMode = false }: { isWindowMode?
     setQuickMinutes('25');
     toast.success('悬赏已发布', { description: newTask.name });
   }, [
-    quickName,
-    quickMinutes,
-    quickDifficulty,
-    addTask,
-    activeAttentionTasks.length,
-    settings.manaMax,
-    addAttentionTask,
+    quickName, quickMinutes, quickDifficulty, addTask,
+    activeAttentionTasks.length, settings.manaMax, addAttentionTask,
   ]);
 
   const handleSetTracking = useCallback(
@@ -223,158 +206,250 @@ export default function FloatingWidget({ isWindowMode = false }: { isWindowMode?
 
   const handleExpandMain = useCallback(() => {
     setFullMode();
-    // Electron 环境下通知主进程显示主窗口
-    if (typeof window !== 'undefined' && (window as any).electronAPI?.window?.showMain) {
-      (window as any).electronAPI.window.showMain();
+    const electronApi = (window as any).electronAPI;
+    if (electronApi?.window?.showMain) {
+      electronApi.window.showMain();
     } else {
       toast.success('已展开主界面');
     }
   }, [setFullMode]);
 
-  const widgetStyle: React.CSSProperties = isWindowMode
-    ? { width: '100%', height: '100%' }
-    : {
-        position: 'fixed',
-        right: position.x < 0 ? `${Math.abs(position.x)}px` : 'auto',
-        left: position.x >= 0 ? `${position.x}px` : 'auto',
-        bottom: position.y < 0 ? `${Math.abs(position.y)}px` : 'auto',
-        top: position.y >= 0 ? `${position.y}px` : 'auto',
-        zIndex: 9999,
+  // 收起态点击：点击非按钮区域展开（长按不算）
+  const handleCollapsedClick = useCallback(
+    (e: React.MouseEvent) => {
+      if (dragStateRef.current.moved || isDraggingMode) return;
+      // 点击按钮区域不处理
+      const target = e.target as HTMLElement;
+      if (target.closest('button')) return;
+      // 按下去少于阈值的是点击
+      const pressDuration = Date.now() - dragStateRef.current.pressedAt;
+      if (pressDuration < LONG_PRESS_THRESHOLD) {
+        handleExpand();
+      }
+    },
+    [handleExpand, isDraggingMode, LONG_PRESS_THRESHOLD],
+  );
+
+  // 收起态鼠标按下：启动长按计时器
+  const handleCollapsedMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      if (isExpanded) return;
+      // 点击按钮区域不处理长按
+      const target = e.target as HTMLElement;
+      if (target.closest('button')) return;
+      
+      dragStateRef.current = {
+        startX: e.clientX,
+        startY: e.clientY,
+        originX: position.x,
+        originY: position.y,
+        moved: false,
+        pressedAt: Date.now(),
       };
+      
+      // 长按进入拖动模式
+      longPressTimerRef.current = setTimeout(() => {
+        setIsDraggingMode(true);
+        setIsDragging(true);
+        document.body.style.cursor = 'grabbing';
+      }, LONG_PRESS_THRESHOLD);
+    },
+    [isExpanded, position.x, position.y, LONG_PRESS_THRESHOLD],
+  );
+
+  // 收起态鼠标抬起：结束长按
+  const handleCollapsedMouseUp = useCallback(() => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+    if (isDraggingMode) {
+      setIsDraggingMode(false);
+      document.body.style.cursor = '';
+    }
+    setIsDragging(false);
+    // 重置状态
+    setTimeout(() => {
+      dragStateRef.current.moved = false;
+    }, 0);
+  }, [isDraggingMode]);
 
   return (
     <div
       ref={widgetRef}
-      style={widgetStyle}
+      style={
+        isWindowMode
+          ? { width: '100%', height: '100%' }
+          : {
+              position: 'fixed',
+              right: position.x < 0 ? `${Math.abs(position.x)}px` : 'auto',
+              left: position.x >= 0 ? `${position.x}px` : 'auto',
+              bottom: position.y < 0 ? `${Math.abs(position.y)}px` : 'auto',
+              top: position.y >= 0 ? `${position.y}px` : 'auto',
+              zIndex: 9999,
+              width: FLOAT_WIDTH,
+            }
+      }
       className="select-none"
-      onMouseEnter={handleExpand}
-      onMouseLeave={handleCollapse}
     >
       <AnimatePresence mode="wait">
         {!isExpanded ? (
           <motion.div
             key="collapsed"
-            initial={{ opacity: 0, scale: 0.9, y: 10 }}
+            initial={{ opacity: 0, scale: 0.92, y: 12 }}
             animate={{
-              opacity: isDragging ? opacity * 0.6 : opacity,
-              scale: isDragging ? 0.95 : 1,
+              opacity: isDragging ? opacity * 0.5 : opacity,
+              scale: isDragging ? 0.96 : 1,
               y: 0,
             }}
-            exit={{ opacity: 0, scale: 0.9, y: 10 }}
-            transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-            onMouseDown={!isWindowMode ? handleDragStart : undefined}
-            style={isWindowMode ? ({ WebkitAppRegion: 'drag', width: '100%' } as CSSProperties) : undefined}
+            exit={{ opacity: 0, scale: 0.92, y: 12 }}
+            transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+            style={isWindowMode ? { width: '100%', height: '100%' } : undefined}
             className={cn(
-              isWindowMode ? 'w-full h-[72px] rounded-xl' : 'w-[360px] h-[72px] rounded-xl cursor-move',
-              'bg-card/90 backdrop-blur-xl border border-primary/40',
-              'shadow-[0_0_20px_rgba(0_0_0_0.5),0_0_40px_var(--color-primary)/15]',
-              'flex items-center gap-3 px-4',
-              'hover:border-primary/60 hover:shadow-[0_0_20px_rgba(0_0_0_0.5),0_0_50px_var(--color-primary)/25]',
+              isWindowMode
+                ? 'w-full h-full rounded-2xl overflow-hidden'
+                : 'rounded-2xl cursor-pointer overflow-hidden',
+              'bg-card/92 backdrop-blur-2xl border border-primary/30',
+              'shadow-[0_4px_24px_rgba(0,0,0,0.5),0_0_40px_rgba(202,166,54,0.12)]',
+              'relative',
               'transition-shadow duration-300',
+              'hover:border-primary/50 hover:shadow-[0_4px_28px_rgba(0,0,0,0.55),0_0_50px_rgba(202,166,54,0.2)]',
             )}
           >
-            {/* 左侧：追踪任务信息 */}
-            <div className="flex-1 min-w-0">
-              {trackingTask ? (
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <Target className="h-3.5 w-3.5 text-primary shrink-0" />
-                    <span className="text-sm font-medium text-foreground truncate">
-                      {trackingTask.name}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="font-mono text-xs text-primary tabular-nums">
-                      {formatDuration(currentTrackSeconds)}
-                    </span>
-                    {isTrackingRunning && (
-                      <span className="flex items-center gap-1 text-[10px] text-success">
-                        <span className="h-1.5 w-1.5 rounded-full bg-success animate-pulse" />
-                        计时中
-                      </span>
-                    )}
-                  </div>
-                </div>
-              ) : (
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <Sparkles className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                    <span className="text-sm text-muted-foreground">暂无追踪任务</span>
-                  </div>
-                  <div className="text-[10px] text-muted-foreground/60">
-                    悬停展开 · 拖拽移动
-                  </div>
-                </div>
+            {/* 点击+长按区域（包含所有内容，支持任意位置点击/长按） */}
+            <div
+              onMouseDown={handleCollapsedMouseDown}
+              onMouseUp={handleCollapsedMouseUp}
+              onMouseLeave={handleCollapsedMouseUp} // 离开时取消长按
+              onClick={handleCollapsedClick}
+              style={isWindowMode ? ({ WebkitAppRegion: 'no-drag', width: '100%', height: '100%' } as CSSProperties) : undefined}
+              className="flex items-center gap-0 px-1 pt-1 relative">
+              {/* 拖动握柄（仅浏览器模式可见，Electron下支持任意位置长按拖动） */}
+              {!isWindowMode && (
+                <div className="absolute top-0 left-0 right-0 h-3 cursor-grab active:cursor-grabbing" />
               )}
-            </div>
+              {/* 左侧：任务/播放控制 */}
+              <div className="flex-1 min-w-0 flex items-center gap-2 px-3 py-2">
+                {trackingTask ? (
+                  <>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-9 w-9 shrink-0 rounded-full bg-primary/10 hover:bg-primary/20 text-primary"
+                      style={isWindowMode ? ({ WebkitAppRegion: 'no-drag' } as CSSProperties) : undefined}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (isTrackingRunning) { pauseTracking(); } else { startTracking(); }
+                      }}
+                    >
+                      {isTrackingRunning ? (
+                        <Pause className="h-4 w-4" />
+                      ) : (
+                        <Play className="h-4 w-4 ml-0.5" />
+                      )}
+                    </Button>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[13px] font-medium text-foreground truncate leading-tight">
+                          {trackingTask.name}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className="font-mono text-[11px] text-primary tabular-nums font-semibold">
+                          {formatDuration(currentTrackSeconds)}
+                        </span>
+                        {isTrackingRunning ? (
+                          <span className="flex items-center gap-1 text-[10px] text-success">
+                            <span className="h-1.5 w-1.5 rounded-full bg-success animate-pulse" />
+                            专注中
+                          </span>
+                        ) : (
+                          <span className="text-[10px] text-muted-foreground">
+                            {trackingTask.estimatedMinutes}分钟
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="h-9 w-9 shrink-0 rounded-full bg-secondary/40 flex items-center justify-center">
+                      <Sparkles className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="text-[13px] text-muted-foreground leading-tight">
+                        点击展开控制台
+                      </div>
+                      <div className="text-[10px] text-muted-foreground/60 mt-0.5">
+                        {completedToday} 个任务已完成
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
 
-            {/* 右侧：状态指示器 */}
-            <div className="flex items-center gap-3 shrink-0">
-              <div className="flex flex-col items-end gap-1">
-                <div className="flex items-center gap-1">
-                  <ListChecks className="h-3 w-3 text-muted-foreground" />
-                  <span className="text-[11px] tabular-nums text-foreground">
-                    {completedToday}/{totalActiveToday}
+              {/* 右侧：快速状态 */}
+              <div className="flex items-center gap-2.5 pr-3 pl-2 border-l border-border/30 py-2">
+                <div className="flex items-center gap-1" title="法力水晶">
+                  <Gem className="h-3.5 w-3.5 text-accent" />
+                  <span className="text-[11px] tabular-nums text-accent font-medium">
+                    {activeAttentionTasks.length}
                   </span>
                 </div>
-                <div className="flex items-center gap-1">
-                  <Gem className="h-3 w-3 text-accent" />
-                  <span className="text-[11px] tabular-nums text-accent">
-                    {activeAttentionTasks.length}/{settings.manaMax}
+                <div className="flex items-center gap-1" title="今日完成">
+                  <Check className="h-3.5 w-3.5 text-success" />
+                  <span className="text-[11px] tabular-nums text-success font-medium">
+                    {completedToday}
                   </span>
                 </div>
               </div>
-              <div className="h-8 w-px bg-border/50" />
-              <div className="h-2 w-2 rounded-full bg-primary/60 animate-pulse" />
             </div>
           </motion.div>
         ) : (
           <motion.div
             key="expanded"
-            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+            initial={{ opacity: 0, scale: 0.95, y: 16 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+            exit={{ opacity: 0, scale: 0.95, y: 16 }}
+            transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
             className={cn(
-              isWindowMode ? 'w-full rounded-xl overflow-hidden' : 'w-[400px] rounded-xl overflow-hidden',
-              'bg-card/95 backdrop-blur-2xl border border-primary/40',
-              'shadow-[0_0_30px_rgba(0_0_0_0.6),0_0_60px_var(--color-primary)/20]',
+              'rounded-2xl overflow-hidden',
+              'bg-card/95 backdrop-blur-2xl border border-primary/30',
+              'shadow-[0_8px_40px_rgba(0,0,0,0.6),0_0_60px_rgba(202,166,54,0.15)]',
             )}
+            style={isWindowMode ? { width: '100%' } : { width: FLOAT_WIDTH }}
           >
             {/* 头部 */}
             <div
-              style={isWindowMode ? ({ WebkitAppRegion: 'drag' } as CSSProperties) : undefined}
-              className="flex items-center justify-between px-4 py-3 border-b border-border/40 bg-gradient-to-r from-primary/10 via-transparent to-accent/10"
+              className="flex items-center justify-between px-4 py-2.5 border-b border-border/40 bg-gradient-to-r from-primary/8 via-transparent to-accent/8"
             >
-              <div className="flex items-center gap-2">
-                <div className="size-7 rounded-md bg-gradient-to-br from-primary to-accent flex items-center justify-center">
-                  <Sparkles className="h-4 w-4 text-primary-foreground" />
+              {/* 拖拽区域 + 点击缩小 */}
+              <div
+                style={isWindowMode ? ({ WebkitAppRegion: 'drag' } as CSSProperties) : undefined}
+                className="flex-1 flex items-center gap-2 cursor-pointer"
+                onClick={(e) => {
+                  // 点击按钮区域不触发
+                  if ((e.target as HTMLElement).closest('button')) return;
+                  handleCollapse();
+                }}
+              >
+                <div className="size-7 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-md shadow-primary/20 pointer-events-none">
+                  <Sparkles className="h-3.5 w-3.5 text-primary-foreground" />
                 </div>
-                <div>
-                  <div className="text-sm font-bold text-foreground">悬赏任务公会</div>
-                  <div className="text-[10px] text-muted-foreground">悬浮控制台</div>
+                <div className="pointer-events-none">
+                  <div className="text-[13px] font-bold text-foreground leading-tight">悬赏任务公会</div>
+                  <div className="text-[10px] text-muted-foreground">
+                    {trackingTask ? '专注中' : '悬浮控制台'}
+                  </div>
                 </div>
               </div>
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-0.5">
                 <Button
                   variant="ghost"
                   size="icon"
-                  className={cn(
-                    'h-7 w-7 hover:bg-secondary/60',
-                    isPinned && 'text-primary',
-                  )}
+                  className="h-7 w-7 rounded-lg"
                   style={isWindowMode ? ({ WebkitAppRegion: 'no-drag' } as CSSProperties) : undefined}
-                  onClick={() => setIsPinned(!isPinned)}
-                  title={isPinned ? '取消置顶' : '置顶'}
-                >
-                  {isPinned ? <PinOff className="h-3.5 w-3.5" /> : <Pin className="h-3.5 w-3.5" />}
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7 hover:bg-secondary/60"
-                  style={isWindowMode ? ({ WebkitAppRegion: 'no-drag' } as CSSProperties) : undefined}
-                  onClick={() => setIsExpanded(false)}
+                  onClick={handleCollapse}
                   title="收起"
                 >
                   <Minimize2 className="h-3.5 w-3.5 text-muted-foreground" />
@@ -382,7 +457,7 @@ export default function FloatingWidget({ isWindowMode = false }: { isWindowMode?
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-7 w-7 hover:bg-secondary/60"
+                  className="h-7 w-7 rounded-lg"
                   style={isWindowMode ? ({ WebkitAppRegion: 'no-drag' } as CSSProperties) : undefined}
                   onClick={handleExpandMain}
                   title="展开主界面"
@@ -393,238 +468,236 @@ export default function FloatingWidget({ isWindowMode = false }: { isWindowMode?
             </div>
 
             {/* 内容区 */}
-            <div className="max-h-[420px] overflow-y-auto p-4 space-y-4">
-              {/* 追踪任务卡 */}
-              {trackingTask ? (
-                <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 space-y-3">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <Badge
-                          variant="outline"
-                          className="text-[10px] h-5 border-primary/40 text-primary bg-primary/10"
-                        >
-                          追踪中
-                        </Badge>
-                        <Badge
-                          variant="outline"
-                          className={cn(
-                            'text-[10px] h-5',
-                            DIFFICULTY_COLORS[trackingTask.difficulty],
-                          )}
-                        >
-                          {DIFFICULTY_LABELS[trackingTask.difficulty]}
-                        </Badge>
-                      </div>
-                      <div className="text-sm font-semibold text-foreground truncate">
-                        {trackingTask.name}
-                      </div>
-                      {trackingTask.bossName && (
-                        <div className="text-[11px] text-muted-foreground mt-0.5">
-                          Boss: {trackingTask.bossName}
+            <div ref={contentRef} className="max-h-[440px] overflow-y-auto">
+              <div className="p-3 space-y-3">
+                {/* 追踪任务卡 */}
+                {trackingTask ? (
+                  <div className="rounded-xl border border-primary/25 bg-gradient-to-br from-primary/8 to-primary/3 p-3 space-y-2.5">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <Badge
+                            variant="outline"
+                            className="text-[10px] h-5 px-1.5 border-primary/40 text-primary bg-primary/10"
+                          >
+                            追踪中
+                          </Badge>
+                          <Badge
+                            variant="outline"
+                            className={cn('text-[10px] h-5 px-1.5', DIFFICULTY_COLORS[trackingTask.difficulty])}
+                          >
+                            {DIFFICULTY_LABELS[trackingTask.difficulty]}
+                          </Badge>
                         </div>
-                      )}
-                    </div>
-                    <div className="text-right shrink-0">
-                      <div className="font-mono text-xl font-bold text-primary tabular-nums">
-                        {formatDuration(currentTrackSeconds)}
+                        <div className="text-[13px] font-semibold text-foreground truncate">
+                          {trackingTask.name}
+                        </div>
                       </div>
-                      <div className="text-[10px] text-muted-foreground">
-                        预估 {trackingTask.estimatedMinutes} 分钟
+                      <div className="text-right shrink-0">
+                        <div className="font-mono text-xl font-bold text-primary tabular-nums leading-none">
+                          {formatDuration(currentTrackSeconds)}
+                        </div>
+                        <div className="text-[10px] text-muted-foreground mt-1">
+                          /{trackingTask.estimatedMinutes}分钟
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  {trackingTask.bossName && (
+                    {/* 进度条 */}
                     <div className="space-y-1">
-                      <div className="flex justify-between text-[10px] text-muted-foreground">
-                        <span>Boss 血量</span>
-                        <span>{trackingTask.bossProgress}%</span>
-                      </div>
                       <Progress
-                        value={trackingTask.bossProgress}
-                        className="h-1.5 bg-secondary/60"
+                        value={Math.min(
+                          100,
+                          Math.round((currentTrackSeconds / 60 / trackingTask.estimatedMinutes) * 100),
+                        )}
+                        className="h-1 bg-secondary/60"
                       />
                     </div>
-                  )}
 
-                  <div className="flex items-center gap-2">
-                    {isTrackingRunning ? (
+                    <div className="flex items-center gap-1.5">
+                      {isTrackingRunning ? (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={pauseTracking}
+                          className="flex-1 h-8 gap-1.5 text-xs"
+                        >
+                          <Pause className="h-3 w-3" />
+                          暂停
+                        </Button>
+                      ) : (
+                        <Button
+                          size="sm"
+                          onClick={startTracking}
+                          className="flex-1 h-8 gap-1.5 text-xs bg-gradient-to-r from-primary to-warning text-primary-foreground shadow-sm"
+                        >
+                          <Play className="h-3 w-3 ml-0.5" />
+                          开始专注
+                        </Button>
+                      )}
                       <Button
-                        variant="secondary"
+                        variant="outline"
                         size="sm"
-                        onClick={pauseTracking}
-                        className="flex-1 gap-1.5"
+                        onClick={() => handleComplete(trackingTask)}
+                        className="h-8 gap-1 text-xs border-success/30 text-success hover:bg-success/10 hover:text-success px-3"
                       >
-                        <Pause className="h-3.5 w-3.5" />
-                        暂停
+                        <Check className="h-3 w-3" />
+                        完成
                       </Button>
-                    ) : (
-                      <Button
-                        size="sm"
-                        onClick={startTracking}
-                        className="flex-1 gap-1.5 bg-gradient-to-r from-primary to-warning text-primary-foreground"
-                      >
-                        <Play className="h-3.5 w-3.5" />
-                        开始专注
-                      </Button>
-                    )}
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleComplete(trackingTask)}
-                      className="gap-1.5 border-success/40 text-success hover:bg-success/10 hover:text-success"
-                    >
-                      <Check className="h-3.5 w-3.5" />
-                      完成
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <div className="rounded-lg border border-dashed border-border/50 bg-secondary/20 p-4 text-center">
-                  <Target className="h-6 w-6 text-muted-foreground mx-auto mb-2 opacity-50" />
-                  <div className="text-sm text-muted-foreground">暂无追踪任务</div>
-                  <div className="text-[11px] text-muted-foreground/60 mt-1">
-                    从下方注意力任务中选择一个开始追踪
-                  </div>
-                </div>
-              )}
-
-              {/* 注意力任务列表 */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5">
-                    <Gem className="h-3.5 w-3.5 text-accent" />
-                    <span className="text-xs font-semibold text-foreground">注意力任务</span>
-                  </div>
-                  <span className="text-[10px] text-muted-foreground tabular-nums">
-                    {activeAttentionTasks.length}/{settings.manaMax}
-                  </span>
-                </div>
-
-                {activeAttentionTasks.length === 0 ? (
-                  <div className="rounded-md border border-dashed border-border/40 bg-secondary/10 p-3 text-center">
-                    <div className="text-xs text-muted-foreground">暂无激活的注意力任务</div>
+                    </div>
                   </div>
                 ) : (
-                  <div className="space-y-1.5">
-                    {activeAttentionTasks.map((task) => (
-                      <motion.div
-                        key={task.id}
-                        initial={{ opacity: 0, x: -10 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        className={cn(
-                          'group flex items-center gap-2 p-2 rounded-md',
-                          'border border-border/40 bg-secondary/30',
-                          'hover:border-accent/40 hover:bg-accent/10',
-                          'transition-colors',
-                        )}
-                      >
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6 shrink-0 opacity-0 group-hover:opacity-100 hover:bg-success/20 hover:text-success transition-opacity"
-                          onClick={() => handleComplete(task)}
-                          title="完成任务"
+                  <div className="rounded-xl border border-dashed border-border/50 bg-secondary/15 p-4 text-center">
+                    <Target className="h-5 w-5 text-muted-foreground mx-auto mb-1.5 opacity-50" />
+                    <div className="text-[13px] text-muted-foreground">暂无追踪任务</div>
+                    <div className="text-[11px] text-muted-foreground/60 mt-0.5">
+                      从下方选择一个开始专注
+                    </div>
+                  </div>
+                )}
+
+                {/* 注意力任务列表 */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between px-0.5">
+                    <div className="flex items-center gap-1.5">
+                      <Gem className="h-3.5 w-3.5 text-accent" />
+                      <span className="text-xs font-semibold text-foreground">注意力任务</span>
+                    </div>
+                    <span className="text-[10px] text-muted-foreground tabular-nums">
+                      {activeAttentionTasks.length}/{settings.manaMax}
+                    </span>
+                  </div>
+
+                  {activeAttentionTasks.length === 0 ? (
+                    <div className="rounded-lg border border-dashed border-border/40 bg-secondary/10 p-2.5 text-center">
+                      <div className="text-[11px] text-muted-foreground">暂无激活的注意力任务</div>
+                    </div>
+                  ) : (
+                    <div className="space-y-1">
+                      {activeAttentionTasks.map((task) => (
+                        <motion.div
+                          key={task.id}
+                          initial={{ opacity: 0, x: -8 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          className={cn(
+                            'group flex items-center gap-1.5 p-2 rounded-lg',
+                            'border border-border/40 bg-secondary/25',
+                            'hover:border-accent/40 hover:bg-accent/8',
+                            'transition-colors',
+                          )}
                         >
-                          <Check className="h-3 w-3" />
-                        </Button>
-                        <div className="flex-1 min-w-0">
-                          <div className="text-xs text-foreground truncate">{task.name}</div>
-                          <div className="text-[10px] text-muted-foreground">
-                            {task.estimatedMinutes} 分钟
-                          </div>
-                        </div>
-                        {!trackingTask && (
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-6 w-6 shrink-0 opacity-0 group-hover:opacity-100 hover:bg-primary/20 hover:text-primary transition-opacity"
-                            onClick={() => handleSetTracking(task.id)}
-                            title="设为追踪"
+                            className="h-6 w-6 shrink-0 rounded-md opacity-60 group-hover:opacity-100 hover:bg-success/15 hover:text-success transition-all"
+                            onClick={() => handleComplete(task)}
+                            title="完成"
                           >
-                            <Target className="h-3 w-3" />
+                            <Check className="h-3 w-3" />
                           </Button>
-                        )}
-                      </motion.div>
-                    ))}
-                  </div>
-                )}
-              </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="text-[12px] text-foreground truncate leading-tight">
+                              {task.name}
+                            </div>
+                            <div className="text-[10px] text-muted-foreground flex items-center gap-1.5 mt-0.5">
+                              <span>{task.estimatedMinutes}分钟</span>
+                              {task.difficulty !== 'normal' && (
+                                <Badge
+                                  variant="outline"
+                                  className={cn('text-[9px] h-3.5 px-1 leading-none', DIFFICULTY_COLORS[task.difficulty])}
+                                >
+                                  {DIFFICULTY_LABELS[task.difficulty]}
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
+                          {!trackingTask && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6 shrink-0 rounded-md opacity-0 group-hover:opacity-100 hover:bg-primary/15 hover:text-primary transition-all"
+                              onClick={() => handleSetTracking(task.id)}
+                              title="设为追踪"
+                            >
+                              <Target className="h-3 w-3" />
+                            </Button>
+                          )}
+                        </motion.div>
+                      ))}
+                    </div>
+                  )}
+                </div>
 
-              {/* 快速悬赏 */}
-              <div className="space-y-2">
-                {!quickOpen ? (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="w-full gap-1.5 border-dashed border-border/50 hover:border-primary/40 hover:bg-primary/5"
-                    onClick={() => setQuickOpen(true)}
-                  >
-                    <Plus className="h-3.5 w-3.5" />
-                    快速发布悬赏
-                  </Button>
-                ) : (
-                  <div className="rounded-md border border-primary/30 bg-primary/5 p-3 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-semibold text-foreground">快速悬赏</span>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-5 w-5 hover:bg-secondary/60"
-                        onClick={() => setQuickOpen(false)}
-                      >
-                        <X className="h-3 w-3 text-muted-foreground" />
-                      </Button>
-                    </div>
-                    <Input
-                      value={quickName}
-                      onChange={(e) => setQuickName(e.target.value)}
-                      placeholder="任务名称..."
-                      className="h-8 text-xs"
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') handleQuickSubmit();
-                      }}
-                      autoFocus
-                    />
-                    <div className="flex items-center gap-2">
-                      <Input
-                        type="number"
-                        value={quickMinutes}
-                        onChange={(e) => setQuickMinutes(e.target.value)}
-                        className="h-8 w-20 text-xs text-center"
-                        min={5}
-                      />
-                      <span className="text-[11px] text-muted-foreground">分钟</span>
-                      <select
-                        value={quickDifficulty}
-                        onChange={(e) =>
-                          setQuickDifficulty(e.target.value as TaskDifficulty)
-                        }
-                        className="h-8 flex-1 rounded-md border border-input bg-background px-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-                      >
-                        <option value="easy">简单</option>
-                        <option value="normal">普通</option>
-                        <option value="hard">困难</option>
-                        <option value="epic">史诗</option>
-                      </select>
-                    </div>
+                {/* 快速悬赏 */}
+                <div className="space-y-1.5">
+                  {!quickOpen ? (
                     <Button
+                      variant="outline"
                       size="sm"
-                      onClick={handleQuickSubmit}
-                      className="w-full gap-1.5 bg-gradient-to-r from-primary to-warning text-primary-foreground"
-                      disabled={!quickName.trim()}
+                      className="w-full h-8 gap-1.5 text-xs border-dashed border-border/50 hover:border-primary/40 hover:bg-primary/5 rounded-lg"
+                      onClick={() => setQuickOpen(true)}
                     >
                       <Plus className="h-3.5 w-3.5" />
-                      发布悬赏
+                      快速发布悬赏
                     </Button>
-                  </div>
-                )}
+                  ) : (
+                    <div className="rounded-xl border border-primary/25 bg-primary/5 p-3 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-foreground">快速悬赏</span>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-5 w-5 rounded-md hover:bg-secondary/60"
+                          onClick={() => setQuickOpen(false)}
+                        >
+                          <X className="h-3 w-3 text-muted-foreground" />
+                        </Button>
+                      </div>
+                      <Input
+                        value={quickName}
+                        onChange={(e) => setQuickName(e.target.value)}
+                        placeholder="任务名称..."
+                        className="h-8 text-xs rounded-lg"
+                        onKeyDown={(e) => { if (e.key === 'Enter') handleQuickSubmit(); }}
+                        autoFocus
+                      />
+                      <div className="flex items-center gap-2">
+                        <Input
+                          type="number"
+                          value={quickMinutes}
+                          onChange={(e) => setQuickMinutes(e.target.value)}
+                          className="h-8 w-20 text-xs text-center rounded-lg"
+                          min={5}
+                        />
+                        <span className="text-[11px] text-muted-foreground">分钟</span>
+                        <select
+                          value={quickDifficulty}
+                          onChange={(e) => setQuickDifficulty(e.target.value as TaskDifficulty)}
+                          className="h-8 flex-1 rounded-lg border border-input bg-background px-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                        >
+                          <option value="easy">简单</option>
+                          <option value="normal">普通</option>
+                          <option value="hard">困难</option>
+                          <option value="epic">史诗</option>
+                        </select>
+                      </div>
+                      <Button
+                        size="sm"
+                        onClick={handleQuickSubmit}
+                        className="w-full h-8 gap-1.5 text-xs bg-gradient-to-r from-primary to-warning text-primary-foreground rounded-lg"
+                        disabled={!quickName.trim()}
+                      >
+                        <Plus className="h-3 w-3" />
+                        发布悬赏
+                      </Button>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 
-            {/* 底部提示 */}
-            <div className="px-4 py-2 border-t border-border/40 bg-secondary/30 flex items-center justify-between">
+            {/* 底部状态条 */}
+            <div className="px-4 py-2 border-t border-border/40 bg-secondary/20 flex items-center justify-between">
               <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
                 <span className="flex items-center gap-1">
                   <ListChecks className="h-3 w-3" />
@@ -635,9 +708,6 @@ export default function FloatingWidget({ isWindowMode = false }: { isWindowMode?
                   法力 {activeAttentionTasks.length}/{settings.manaMax}
                 </span>
               </div>
-              <span className="text-[10px] text-muted-foreground/60">
-                悬停收起条可拖拽
-              </span>
             </div>
           </motion.div>
         )}

@@ -18,17 +18,28 @@ contextBridge.exposeInMainWorld('electronAPI', {
     minimizeToFloat: () => ipcRenderer.invoke('window:minimizeToFloat'),
     expandFloat: () => ipcRenderer.invoke('window:expandFloat'),
     collapseFloat: () => ipcRenderer.invoke('window:collapseFloat'),
+    setHeight: (height) => ipcRenderer.invoke('window:setFloatHeight', height),
     quit: () => ipcRenderer.invoke('app:quit')
   },
 
-  // 数据同步监听
+  // 通用事件监听
+  on: (channel, callback) => {
+    const allowedChannels = ['data:sync', 'data:storage-changed', 'float:auto-collapse'];
+    if (!allowedChannels.includes(channel)) return;
+    const handler = (_, data) => callback(data);
+    ipcRenderer.on(channel, handler);
+    return () => ipcRenderer.removeListener(channel, handler);
+  },
+
+  // 数据同步监听（兼容旧代码）
   onDataSync: (callback) => {
-    ipcRenderer.on('data:sync', (_, data) => callback(data));
+    const handler = (_, data) => callback(data);
+    ipcRenderer.on('data:sync', handler);
+    return () => ipcRenderer.removeListener('data:sync', handler);
   },
   onStorageChanged: (callback) => {
     const handler = (_, data) => callback(data);
     ipcRenderer.on('data:storage-changed', handler);
-    // 返回取消订阅函数
     return () => ipcRenderer.removeListener('data:storage-changed', handler);
   },
 
