@@ -70,3 +70,12 @@ pnpm-lock.yaml
 # Agent files
 .agent/
 quest-guild-electron/output/
+
+.db
+.db-shm
+.db-wal
+
+server\quest-guild.db-wal
+server\quest-guild.db-shm
+server\quest-guild-backups.db
+server\quest-guild.db

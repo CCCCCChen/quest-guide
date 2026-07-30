@@ -709,7 +709,7 @@ app.get('/api/skills', (req, res) => {
 
 app.post('/api/skills/batch-init', (req, res) => {
   const skills = req.body;
-  const insert = db.prepare(`INSERT OR IGNORE INTO skills 
+  const insert = db.prepare(`INSERT OR IGNORE INTO skills
     (id, name, description, category, parentId, level, status, x, y, icon, requiredSkillPoints, unlockedAt, proficiencyLevel, experience, lastImprovedAt)
     VALUES (@id, @name, @description, @category, @parentId, @level, @status, @x, @y, @icon, @requiredSkillPoints, @unlockedAt, @proficiencyLevel, @experience, @lastImprovedAt)`);
 
@@ -737,7 +737,7 @@ app.post('/api/skills', (req, res) => {
     return res.status(400).json({ error: 'id, name, category 必填' });
   }
   try {
-    db.prepare(`INSERT INTO skills 
+    db.prepare(`INSERT INTO skills
       (id, name, description, category, parentId, level, status, x, y, icon, requiredSkillPoints, unlockedAt, proficiencyLevel, experience, lastImprovedAt)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
       id, name, description || '', category, parentId || null, level || 1, status || 'locked',
@@ -782,7 +782,7 @@ app.post('/api/skills/import', (req, res) => {
   const skills = req.body;
   if (!Array.isArray(skills)) return res.status(400).json({ error: '需要数组格式' });
 
-  const insert = db.prepare(`INSERT OR REPLACE INTO skills 
+  const insert = db.prepare(`INSERT OR REPLACE INTO skills
     (id, name, description, category, parentId, level, status, x, y, icon, requiredSkillPoints, unlockedAt, proficiencyLevel, experience, lastImprovedAt)
     VALUES (@id, @name, @description, @category, @parentId, @level, @status, @x, @y, @icon, @requiredSkillPoints, @unlockedAt, @proficiencyLevel, @experience, @lastImprovedAt)`);
 

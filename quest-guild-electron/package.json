@@ -28,6 +28,7 @@
   "build": {
     "appId": "com.questguild.app",
     "productName": "悬赏任务公会",
+    "icon": "assets/icon.ico",
     "electronDownload": {
       "cache": ".electron-cache"
     },
@@ -42,6 +43,7 @@
       "assets/**/*"
     ],
     "win": {
+      "icon": "assets/icon.ico",
       "signAndEditExecutable": false,
       "target": [
         {

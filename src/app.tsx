@@ -11,7 +11,7 @@ import SkillTreePage from "@/pages/SkillTree/SkillTreePage";
 import ShopPage from "@/pages/Shop/ShopPage";
 import StatsPage from "@/pages/Stats/StatsPage";
 import SettingsPage from "@/pages/Settings/SettingsPage";
-import FloatingWidget from "@/components/FloatingWidget";
+import FloatingTodayPage from "@/components/FloatingTodayPage";
 import { useEffect } from "react";
 
 export default function App() {
@@ -34,7 +34,7 @@ export default function App() {
   if (isFloatingMode) {
     return (
       <div className="w-full h-screen overflow-hidden bg-transparent">
-        <FloatingWidget isWindowMode />
+        <FloatingTodayPage isWindowMode />
       </div>
     );
   }

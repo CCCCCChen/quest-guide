@@ -126,7 +126,7 @@ function createMainWindow() {
     if (!isQuitting) {
       e.preventDefault();
       mainWindow.hide();
-      showFloatWindow();
+      showFloatWindowIfEnabled();
     }
   });
 
@@ -154,15 +154,15 @@ function createFloatWindow() {
     x,
     y,
     frame: false,
-    transparent: true,
-    resizable: true,
+    transparent: false,
+    backgroundColor: '#1a1a2e',
+    resizable: false,
     minWidth: APP_CONFIG.floatWidth,
     maxWidth: APP_CONFIG.floatWidth,
     minHeight: APP_CONFIG.floatHeight,
     maxHeight: APP_CONFIG.floatExpandedHeight,
     alwaysOnTop: true,
     skipTaskbar: true,
-    hasShadow: false,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -212,30 +212,10 @@ function showFloatWindow() {
   floatWindow.show();
 }
 
-// 隐藏悬浮窗
-function hideFloatWindow() {
-  if (floatWindow) {
-    floatWindow.hide();
-  }
-}
-
-// 创建系统托盘
-function createTray() {
-  const fs = require('fs');
-  const iconPath = path.join(__dirname, 'assets/icon.png');
-  
-  let trayIcon;
-  if (fs.existsSync(iconPath)) {
-    trayIcon = nativeImage.createFromPath(iconPath).resize({ width: 16, height: 16 });
-  } else {
-    // 如果没有图标文件，创建一个空的透明图标
-    trayIcon = nativeImage.createEmpty();
-  }
-  
-  tray = new Tray(trayIcon);
-  tray.setToolTip('悬赏任务公会');
-
-  const contextMenu = Menu.buildFromTemplate([
+// 构建托盘菜单
+function buildTrayMenu() {
+  const floatVisible = store.get('floatWindowVisible', true);
+  return Menu.buildFromTemplate([
     {
       label: '打开主界面',
       click: () => {
@@ -244,13 +224,21 @@ function createTray() {
         }
         mainWindow.show();
         mainWindow.focus();
-        hideFloatWindow();
+        if (floatWindow) floatWindow.hide();
       }
     },
     {
       label: '显示悬浮窗',
-      click: () => {
-        showFloatWindow();
+      type: 'checkbox',
+      checked: floatVisible,
+      click: (menuItem) => {
+        store.set('floatWindowVisible', menuItem.checked);
+        if (menuItem.checked) {
+          showFloatWindow();
+        } else {
+          if (floatWindow) floatWindow.hide();
+        }
+        if (tray) tray.setContextMenu(buildTrayMenu());
       }
     },
     { type: 'separator' },
@@ -267,20 +255,53 @@ function createTray() {
       }
     }
   ]);
+}
 
-  tray.setContextMenu(contextMenu);
+// 隐藏悬浮窗
+function hideFloatWindow() {
+  if (floatWindow) {
+    floatWindow.hide();
+  }
+}
+
+// 按设置决定是否显示悬浮窗
+function showFloatWindowIfEnabled() {
+  const floatVisible = store.get('floatWindowVisible', true);
+  if (floatVisible) {
+    showFloatWindow();
+  }
+}
+
+// 创建系统托盘
+function createTray() {
+  const iconPath16 = path.join(__dirname, 'assets', 'icon_16.png');
+  const iconPath32 = path.join(__dirname, 'assets', 'icon.png');
+  
+  let trayIcon;
+  if (fs.existsSync(iconPath16)) {
+    trayIcon = nativeImage.createFromPath(iconPath16);
+  } else if (fs.existsSync(iconPath32)) {
+    trayIcon = nativeImage.createFromPath(iconPath32).resize({ width: 16, height: 16 });
+  } else {
+    trayIcon = nativeImage.createEmpty();
+  }
+  
+  tray = new Tray(trayIcon);
+  tray.setToolTip('悬赏任务公会');
+
+  tray.setContextMenu(buildTrayMenu());
 
   tray.on('click', () => {
     if (mainWindow && mainWindow.isVisible()) {
       mainWindow.hide();
-      showFloatWindow();
+      showFloatWindowIfEnabled();
     } else {
       if (!mainWindow) {
         createMainWindow();
       }
       mainWindow.show();
       mainWindow.focus();
-      hideFloatWindow();
+      if (floatWindow) floatWindow.hide();
     }
   });
 }
@@ -347,14 +368,14 @@ ipcMain.handle('window:showMain', () => {
   }
   mainWindow.show();
   mainWindow.focus();
-  hideFloatWindow();
+  if (floatWindow) floatWindow.hide();
   return true;
 });
 
 ipcMain.handle('window:hideMain', () => {
   if (mainWindow) {
     mainWindow.hide();
-    showFloatWindow();
+    showFloatWindowIfEnabled();
   }
   return true;
 });
@@ -362,7 +383,7 @@ ipcMain.handle('window:hideMain', () => {
 ipcMain.handle('window:minimizeToFloat', () => {
   if (mainWindow) {
     mainWindow.hide();
-    showFloatWindow();
+    showFloatWindowIfEnabled();
   }
   return true;
 });
@@ -457,28 +478,28 @@ function animateFloatWindowHeight(nextHeight) {
 
 ipcMain.handle('window:expandFloat', async () => {
   if (floatWindow) {
-    // 展开时恢复完整矩形区域
+    await animateFloatWindowHeight(APP_CONFIG.floatExpandedHeight);
+    // 动画完成后再扩形状，避免动画期间空白区域可点击
     floatWindow.setShape([{
       x: 0,
       y: 0,
       width: APP_CONFIG.floatWidth,
       height: APP_CONFIG.floatExpandedHeight,
     }]);
-    await animateFloatWindowHeight(APP_CONFIG.floatExpandedHeight);
   }
   return true;
 });
 
 ipcMain.handle('window:collapseFloat', async () => {
   if (floatWindow) {
-    await animateFloatWindowHeight(APP_CONFIG.floatHeight);
-    // 收起时只保留顶部条区域，其余完全穿透
+    // 先限制形状再收窗口，避免窗口缩小后形状未更新
     floatWindow.setShape([{
       x: 0,
       y: 0,
       width: APP_CONFIG.floatWidth,
       height: APP_CONFIG.floatHeight,
     }]);
+    await animateFloatWindowHeight(APP_CONFIG.floatHeight);
   }
   return true;
 });
@@ -518,9 +539,9 @@ app.whenReady().then(() => {
   createMainWindow();
   createTray();
   
-  // 默认显示悬浮窗
+  // 根据用户设置决定是否显示悬浮窗
   setTimeout(() => {
-    showFloatWindow();
+    showFloatWindowIfEnabled();
   }, 1000);
 
   app.on('activate', () => {
