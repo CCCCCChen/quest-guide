@@ -131,7 +131,6 @@ export function isElectron(): boolean {
 // ========== 跨窗口同步订阅 ==========
 
 const storageListeners = new Set<StorageChangeCallback>();
-let storageListenerUnsubscribe: (() => void) | null = null;
 let storageListenerInitialized = false;
 
 /**
@@ -146,7 +145,7 @@ function initStorageListener(): void {
   const electronApi = (window as any).electronAPI;
   if (electronApi?.onStorageChanged) {
     // Electron: 监听主进程广播
-    storageListenerUnsubscribe = electronApi.onStorageChanged((event: { key: string; value: unknown }) => {
+    electronApi.onStorageChanged((event: { key: string; value: unknown }) => {
       // value 可能是对象（IPC 序列化后丢失类型），转换为字符串以保持与 getItem 接口一致
       const normalized = event.value === null || event.value === undefined
         ? null

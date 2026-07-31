@@ -1,7 +1,5 @@
 // EXPORTS: playSound, SoundType
 
-import { useSettings } from '@/hooks/useSettings';
-
 export type SoundType = 'complete' | 'click' | 'levelup' | 'error' | 'redeem';
 
 // 使用 Web Audio API 生成简单音效，无需外部音频文件

@@ -162,7 +162,7 @@ export function useTasks() {
       secs += Math.floor((Date.now() - activeTrack.lastStartTime) / 1000);
     }
     return secs;
-  }, [activeTrack, globalTick]);
+  }, [activeTrack]);
 
   const trackingTask = useMemo(() => {
     if (!activeTrack) return null;
@@ -494,7 +494,7 @@ export function useTasks() {
   // 获取子任务
   const getSubTasks = useCallback(
     (parentId: string) => tasksState.filter((t) => t.parentId === parentId),
-    [tasksState],
+    [],
   );
 
   return {

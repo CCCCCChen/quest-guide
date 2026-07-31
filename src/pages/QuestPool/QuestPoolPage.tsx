@@ -26,7 +26,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Select,
   SelectTrigger,
@@ -40,7 +40,6 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
-  DialogTrigger,
 } from '@/components/ui/dialog';
 import {
   Form,
@@ -50,7 +49,8 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
-import { Textarea } from '@/components/ui/textarea';
+import { MarkdownEditor } from '@/components/ui/markdown-editor';
+import { MarkdownRenderer } from '@/components/ui/markdown-renderer';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -535,8 +535,9 @@ export default function QuestPoolPage() {
                   <FormItem>
                     <FormLabel>任务描述</FormLabel>
                     <FormControl>
-                      <Textarea
-                        {...field}
+                      <MarkdownEditor
+                        value={field.value}
+                        onChange={field.onChange}
                         placeholder="描述任务目标与细节"
                         rows={3}
                       />
@@ -1083,7 +1084,7 @@ function EpicTaskNode({
                 <div className="space-y-4">
                   {Array.from(new Set(children.map((c) => c.stage || 1)))
                     .sort((a, b) => a - b)
-                    .map((stage, stageIdx, arr) => {
+                    .map((stage, stageIdx, _arr) => {
                       const stageTasks = children.filter((c) => (c.stage || 1) === stage);
                       return (
                         <div key={stage}>
@@ -1349,9 +1350,7 @@ function DailyTaskCard({
       </div>
 
       {task.description && (
-        <p className="text-xs text-muted-foreground mb-3 line-clamp-2">
-          {task.description}
-        </p>
+        <MarkdownRenderer content={task.description} className="text-xs text-muted-foreground mb-3 line-clamp-2" />
       )}
 
       <div className="flex items-center gap-3 text-xs text-muted-foreground mb-3">

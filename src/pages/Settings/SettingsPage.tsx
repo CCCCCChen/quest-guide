@@ -36,7 +36,7 @@ import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { playSound } from '@/lib/sound';
 import {
   AlertDialog,
@@ -58,7 +58,6 @@ import {
   validateData,
   type IBackupInfo,
 } from '@/lib/backup';
-import { formatDuration } from '@/lib/utils';
 
 const STORAGE_KEYS = [
   '__quest_guild_tasks',
@@ -209,7 +208,6 @@ export default function SettingsPage() {
         try {
           const data = JSON.parse(ev.target?.result as string) as Record<string, unknown>;
           
-          const dataKeys = Object.keys(data);
           const hasAnyData = STORAGE_KEYS.some((k) => data[k] !== undefined);
           
           if (!hasAnyData) {

@@ -238,30 +238,6 @@ export default function FloatingWidget({ isWindowMode = false }: { isWindowMode?
     }
   }, [setFullMode]);
 
-  // ========== 收起态交互：按下即可拖拽，双击展开 ==========
-  const handleCollapsedMouseDown = useCallback(
-    (e: React.MouseEvent) => {
-      if (isExpanded) return;
-      const target = e.target as HTMLElement;
-      if (target.closest('button')) return;
-
-      let originX = position.x;
-      let originY = position.y;
-      if (isWindowMode) {
-        const winPos = getElectronWindowPos();
-        if (winPos) { originX = winPos.x; originY = winPos.y; }
-      }
-      dragStateRef.current = { startX: e.clientX, startY: e.clientY, originX, originY, moved: false };
-      setIsDragging(true);
-    },
-    [isExpanded, isWindowMode, position.x, position.y, getElectronWindowPos],
-  );
-
-  const handleCollapsedMouseUp = useCallback(() => {
-    setIsDragging(false);
-    setTimeout(() => { dragStateRef.current.moved = false; }, 0);
-  }, []);
-
   const handleCollapsedDoubleClick = useCallback(
     (e: React.MouseEvent) => {
       if (dragStateRef.current.moved) return;
@@ -271,54 +247,6 @@ export default function FloatingWidget({ isWindowMode = false }: { isWindowMode?
     },
     [handleExpand],
   );
-
-  // 单击不做操作（双击才展开）
-  const handleCollapsedClick = useCallback((_e: React.MouseEvent) => {}, []);
-
-  // ========== 展开态标题栏交互：按下即可拖拽，双击缩小 ==========
-  const handleHeaderMouseDown = useCallback(
-    (e: React.MouseEvent) => {
-      const target = e.target as HTMLElement;
-      if (target.closest('button')) return;
-      let originX = position.x;
-      let originY = position.y;
-      if (isWindowMode) {
-        const winPos = getElectronWindowPos();
-        if (winPos) { originX = winPos.x; originY = winPos.y; }
-      }
-      expandedDragRef.current = { startX: e.clientX, startY: e.clientY, originX, originY, moved: false };
-
-      const moveHandler = (ev: MouseEvent) => {
-        const dx = ev.clientX - expandedDragRef.current.startX;
-        const dy = ev.clientY - expandedDragRef.current.startY;
-        if (Math.abs(dx) > DRAG_THRESHOLD || Math.abs(dy) > DRAG_THRESHOLD) {
-          expandedDragRef.current.moved = true;
-        }
-        const nx = expandedDragRef.current.originX + dx;
-        const ny = expandedDragRef.current.originY + dy;
-        if (isWindowMode) {
-          moveElectronWindow(nx, ny);
-          updateSettings({ floatingPosition: { x: nx, y: ny } });
-        } else {
-          updateSettings({ floatingPosition: { x: nx, y: ny } });
-        }
-      };
-      const upHandler = () => {
-        window.removeEventListener('mousemove', moveHandler);
-        window.removeEventListener('mouseup', upHandler);
-        document.body.style.cursor = '';
-        setTimeout(() => { expandedDragRef.current.moved = false; }, 0);
-      };
-      document.body.style.cursor = 'grabbing';
-      window.addEventListener('mousemove', moveHandler);
-      window.addEventListener('mouseup', upHandler);
-    },
-    [isWindowMode, position.x, position.y, getElectronWindowPos, moveElectronWindow, updateSettings, DRAG_THRESHOLD],
-  );
-
-  const handleHeaderMouseUp = useCallback(() => {
-    document.body.style.cursor = '';
-  }, []);
 
   const handleHeaderDoubleClick = useCallback(
     (e: React.MouseEvent) => {

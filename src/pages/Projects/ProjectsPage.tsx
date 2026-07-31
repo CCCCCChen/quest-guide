@@ -8,7 +8,8 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
+import { MarkdownEditor } from '@/components/ui/markdown-editor';
+import { MarkdownRenderer } from '@/components/ui/markdown-renderer';
 import {
   Dialog,
   DialogContent,
@@ -239,7 +240,7 @@ export default function ProjectsPage() {
                     <FormItem>
                       <FormLabel>描述</FormLabel>
                       <FormControl>
-                        <Textarea placeholder="范围、里程碑、验收标准" className="min-h-20" {...field} />
+                        <MarkdownEditor value={field.value} onChange={field.onChange} placeholder="范围、里程碑、验收标准" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -316,8 +317,8 @@ export default function ProjectsPage() {
               </div>
             </CardHeader>
             <CardContent className="space-y-3">
-              <div className="text-sm text-muted-foreground whitespace-pre-wrap">
-                {project.description || '（暂无描述）'}
+              <div className="text-sm text-muted-foreground">
+                {project.description ? <MarkdownRenderer content={project.description} /> : '（暂无描述）'}
               </div>
               <div className="space-y-1">
                 <div className="flex items-center justify-between text-xs text-muted-foreground">

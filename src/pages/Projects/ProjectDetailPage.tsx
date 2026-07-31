@@ -26,6 +26,7 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
+import { MarkdownRenderer } from '@/components/ui/markdown-renderer';
 import { useGoals } from '@/hooks/useGoals';
 import { useProjects } from '@/hooks/useProjects';
 import { useTasks } from '@/hooks/useTasks';
@@ -164,8 +165,8 @@ export default function ProjectDetailPage() {
               <Badge variant="outline">{pendingCount} 待开始</Badge>
             </div>
           </div>
-          <div className="max-w-xl text-sm text-muted-foreground whitespace-pre-wrap">
-            {project.description || '（暂无描述）'}
+          <div className="max-w-xl text-sm text-muted-foreground">
+            {project.description ? <MarkdownRenderer content={project.description} /> : '（暂无描述）'}
           </div>
         </div>
 

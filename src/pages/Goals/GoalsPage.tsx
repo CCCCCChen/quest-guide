@@ -6,7 +6,8 @@ import { useForm } from 'react-hook-form';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
+import { MarkdownEditor } from '@/components/ui/markdown-editor';
+import { MarkdownRenderer } from '@/components/ui/markdown-renderer';
 import {
   Dialog,
   DialogContent,
@@ -154,7 +155,7 @@ export default function GoalsPage() {
                     <FormItem>
                       <FormLabel>描述</FormLabel>
                       <FormControl>
-                        <Textarea placeholder="为什么重要？成功标准是什么？" className="min-h-20" {...field} />
+                        <MarkdownEditor value={field.value} onChange={field.onChange} placeholder="为什么重要？成功标准是什么？" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -223,8 +224,8 @@ export default function GoalsPage() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="text-sm text-muted-foreground whitespace-pre-wrap">
-                {goal.description || '（暂无描述）'}
+              <div className="text-sm text-muted-foreground">
+                {goal.description ? <MarkdownRenderer content={goal.description} /> : '（暂无描述）'}
               </div>
             </CardContent>
           </Card>

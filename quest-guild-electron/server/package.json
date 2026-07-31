@@ -1,6 +1,6 @@
 {
   "name": "quest-guild-server",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "悬赏任务公会后端服务",
   "main": "index.js",
   "scripts": {

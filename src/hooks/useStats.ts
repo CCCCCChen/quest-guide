@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { useTasks } from '@/hooks/useTasks';
 import { useSkills } from '@/hooks/useSkills';
 import { useShop } from '@/hooks/useShop';
-import type { IQuestTask, IFocusLog } from '@/types/quest';
+
 
 // 辅助：获取过去 N 天的日期数组（YYYY-MM-DD）
 function getPastDays(n: number): string[] {
